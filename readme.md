@@ -1,6 +1,6 @@
 # Levvel API 🚀
 
-Este é o backend assíncrono para o sistema de anúncio e agendamento de serviços de saúde, beleza e bem-estar do projeto **Levvel**[cite: 4]. A API foi construída utilizando **FastAPI** e integrada diretamente ao **Supabase** como provedor de banco de dados (PostgreSQL).
+Este é o backend assíncrono para o sistema de anúncio e agendamento de serviços de saúde, beleza e bem-estar do projeto **Levvel**. A API foi construída utilizando **FastAPI** e integrada diretamente ao **Supabase** como provedor de banco de dados (PostgreSQL).
 
 A aplicação foi totalmente configurada com políticas de **CORS** para permitir o consumo nativo e seguro por aplicações construídas em **Vite/Vue.js** rodando localmente.
 

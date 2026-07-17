@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  /* =========================================
+     Esquema Azul (Blue Scheme)
+  ========================================= */
+
+  /* Cores da Marca */
+  --color-brand-primary-blue: #88b2cc;
+  --color-brand-secondary-blue: #62929e;
+
+  /* Light Theme - Azul */
+  --color-light-bg-blue: #f2f5f8;
+  --color-light-surface-blue: #ffffff;
+  --color-light-alt-blue: #f4f6f9;
+  --color-light-base-blue: #12181f;
+  --color-light-muted-blue: #1c242e;
+
+  /* Dark Theme - Azul */
+  --color-dark-bg-blue: #12181f;
+  --color-dark-surface-blue: #1c242e;
+  --color-dark-alt-blue: #283340;
+  --color-dark-base-blue: #f2f5f8;
+  --color-dark-muted-blue: #f4f6f9;
+
+  /* =========================================
+     Esquema Verde (Green Scheme)
+  ========================================= */
+
+  /* Cores da Marca */
+  --color-brand-primary-green: #87b38d;
+  --color-brand-secondary-green: #a3c9a8;
+
+  /* Light Theme - Verde */
+  --color-light-bg-green: #f7f9f7;
+  --color-light-surface-green: #ffffff;
+  --color-light-alt-green: #f4f7f5;
+  --color-light-base-green: #161c18;
+  --color-light-muted-green: #29332c;
+
+  /* Dark Theme - Verde */
+  --color-dark-bg-green: #161c18;
+  --color-dark-surface-green: #1e2621;
+  --color-dark-alt-green: #29332c;
+  --color-dark-base-green: #f7f9f7;
+  --color-dark-muted-green: #f4f7f5;
+}
+
+@custom-variant dark (&:is(.dark *));

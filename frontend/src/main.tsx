@@ -1,10 +1,5 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "./index.css";
-import { AppShowcase } from "./components/showcase.tsx";
+import "./styles/index.css";
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <AppShowcase />
-  </StrictMode>,
-);
+createRoot(document.getElementById("root")!).render(<StrictMode></StrictMode>);

@@ -30,5 +30,5 @@ app.include_router(agendamentos.router, prefix="/v1/agendamentos", tags=["Agenda
 async def root():
     return {
         "status": "online",
-        "message": "API Levvel operacional e integrada ao Supabase!"
+        "message": "API Levvel Operacional e conexão bem sucessida.",
     }

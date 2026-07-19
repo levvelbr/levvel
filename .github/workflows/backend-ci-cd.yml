@@ -1,0 +1,41 @@
+name: Backend CI/CD (FastAPI)
+
+on:
+  push:
+    branches: [ "backend" ]
+    paths:
+      - 'app/**'
+      - 'requirements.txt'
+      - '.github/workflows/backend-ci-cd.yml'
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar Dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 pytest # Ferramentas de qualidade adicionais
+
+      - name: Executar Linter (Validação de Código)
+        run: flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+
+  deploy-backend:
+    needs: test-and-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Deploy no Servidor (Ex: Render/Railway)
+        # Substitua pelo webhook ou CLI do seu provedor de nuvem de produção
+        run: |
+          echo "Disparando Deploy do Backend em Produção..."
+          curl -X POST "${{ secrets.BACKEND_DEPLOY_WEBHOOK }}"

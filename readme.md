@@ -33,7 +33,8 @@ levvel-backend/
 │   └── schemas/                # Modelos Pydantic (Contratos de Entrada/Saída de JSON)
 │       ├── cliente.py
 │       ├── estabelecimento.py
-│       └── agendamento.py
+│       ├── agendamento.py
+│       └── role.py
 ├── .env                        # Arquivo local com credenciais do Supabase (ignorado no Git)
 ├── requirements.txt            # Dependências Python do projeto
 └── README.md

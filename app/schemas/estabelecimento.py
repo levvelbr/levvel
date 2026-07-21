@@ -1,28 +1,47 @@
-from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional
+from pydantic import BaseModel, EmailStr, Field
+from typing import List, Dict, Any, Optional
+from datetime import datetime
+from uuid import UUID
+
+class HorarioFuncionamento(BaseModel):
+    # Permite flexibilidade no JSONB ou validação por dia da semana
+    segunda: Optional[Dict[str, str]] = None
+    terca: Optional[Dict[str, str]] = None
+    quarta: Optional[Dict[str, str]] = None
+    quinta: Optional[Dict[str, str]] = None
+    sexta: Optional[Dict[str, str]] = None
+    sabado: Optional[Dict[str, str]] = None
+    domingo: Optional[Dict[str, str]] = None
 
 class EstabelecimentoBase(BaseModel):
-    nome_estabelecimento: str = Field(..., min_length=3, description="Nome comercial do estabelecimento ou autônomo")
-    responsavel: str = Field(..., description="Nome do responsável legal")
-    telefone: str = Field(..., description="Telefone de contato")
-    email: EmailStr = Field(..., description="E-mail de contato")
-    localizacao: str = Field(..., description="Endereço ou coordenadas para locomoção")
+    nome_estabelecimento: str = Field(..., min_length=2, description="Nome Fantasia")
+    responsavel: str = Field(..., min_length=2)
+    telefone: str
+    email: EmailStr
+    localizacao: str
     
-    # Listas simples de strings para categorizar o que o estabelecimento atende inicialmente
-    servicos_oferecidos: List[str] = Field(default=[], description="Ex: Corte, Barbearia, Manicure")
-    tecnicas_utilizadas: List[str] = Field(default=[], description="Ex: Luzes, Degradê, Massagem Terapêutica")
-    produtos_aplicados: List[str] = Field(default=[], description="Ex: Marcas ou tipos de produtos químicos/cosméticos")
-    profissionais_envolvidos: List[str] = Field(default=[], description="Nome dos funcionários/colaboradores")
+    # Novos campos úteis
+    cnpj: Optional[str] = None
+    razao_social: Optional[str] = None
+    categoria: str = "Geral"
+    instagram: Optional[str] = None
     
-    # Configuração de dias e horários de funcionamento
-    horario_funcionamento: dict = Field(..., description="JSON mapeando dias e horas (ex: {'seg-sex': '09:00-18:00'})")
+    # Listas/Arrays no Postgres
+    servicos_oferecidos: List[str] = []
+    tecnicas_utilizadas: List[str] = []
+    produtos_aplicados: List[str] = []
+    profissionais_envolvidos: List[str] = []
+    
+    # JSONB
+    horario_funcionamento: Dict[str, Any] = {}
 
 class EstabelecimentoCreate(EstabelecimentoBase):
     pass
 
 class EstabelecimentoResponse(EstabelecimentoBase):
-    id: str = Field(..., description="ID gerado automaticamente pelo Supabase (UUID)")
-    criado_em: str = Field(..., description="Timestamp de criação do registro")
+    id: UUID
+    ativo: bool = True
+    criado_em: datetime
 
     class Config:
         from_attributes = True

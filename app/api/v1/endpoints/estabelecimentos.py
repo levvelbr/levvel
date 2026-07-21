@@ -26,6 +26,13 @@ async def cadastrar_estabelecimento(estabelecimento: EstabelecimentoCreate):
         return resposta.data[0]
         
     except APIError as error:
+        # Tratamento do erro Postgres 23505 (Unique Violation) -> E-mail ou CNPJ já cadastrado
+        if error.code == "23505":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Já existe um estabelecimento cadastrado com este e-mail ou CNPJ."
+            )
+            
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Erro no Supabase: {error.message}"
@@ -34,14 +41,13 @@ async def cadastrar_estabelecimento(estabelecimento: EstabelecimentoCreate):
 @router.get("/", response_model=List[EstabelecimentoResponse])
 async def listar_estabelecimentos(categoria: Optional[str] = None):
     """
-    Lista todos os estabelecimentos. Permite filtros futuros por categoria ou localização.
+    Lista todos os estabelecimentos. Permite filtros por categoria ou serviço.
     """
     try:
-        # Busca básica no Supabase
         query = supabase_client.table("estabelecimentos").select("*")
         
-        # Exemplo de filtro caso o front-end envie parâmetros
         if categoria:
+            # Busca filtrando se o termo existe no array de serviços oferecidos
             query = query.contains("servicos_oferecidos", [categoria])
             
         resposta = query.execute()

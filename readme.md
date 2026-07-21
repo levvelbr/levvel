@@ -92,3 +92,5 @@ A API está explicitamente configurada para aceitar requisições originadas de:
 http://localhost:5173 (Porta padrão do Vite)
 
 http://127.0.0.1:5173
+
+http://localhost:8000

@@ -1,18 +1,24 @@
-name: "Frontend CI/CD (Vite / Vue)"
+name: "Frontend CI/CD (Vite / React)"
 
 on:
   push:
     branches: [ "frontend" ]
     paths:
-      - 'src/**'
-      - 'public/**'
-      - 'package.json'
-      - 'vite.config.js'
+      - 'frontend/src/**'
+      - 'frontend/public/**'
+      - 'frontend/package.json'
+      - 'frontend/vite.config.js'
+      - 'frontend/vite.config.ts'
       - '.github/workflows/frontend-ci-cd.yml'
 
 jobs:
   build-and-test:
+    name: "1. Validar Build e Código"
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend # <--- Garante que os comandos rodem na pasta do React
+
     steps:
       - name: "Checkout Código"
         uses: actions/checkout@v4
@@ -22,18 +28,24 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json' # <--- Local do lockfile
 
       - name: "Instalar Dependências"
         run: npm ci
 
-      - name: Executar Build de Produção (Vite)
+      - name: "Executar Build de Teste (Vite)"
         run: npm run build
         env:
-          VITE_API_URL: "https://api.levvel.com.br/v1" # Injeta URL de produção no build
+          VITE_API_URL: "https://api.levvel.com.br/v1"
 
   deploy-frontend:
+    name: "2. Deploy para Vercel"
     needs: build-and-test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend # <--- Garante que a CLI da Vercel execute dentro da pasta do frontend
+
     steps:
       - name: "Checkout Code"
         uses: actions/checkout@v4
@@ -43,26 +55,23 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
 
-      # Instala a CLI oficial da Vercel globalmente na máquina do GitHub Actions
       - name: "Install Vercel CLI"
         run: npm install --global vercel
 
-      # Puxa as configurações e metadados do projeto da Vercel (evita arquivos locais expostos)
       - name: "Pull Vercel Environment Information"
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      # Compila os arquivos de produção (gera a pasta dist/ otimizada) dentro do ambiente Vercel
       - name: "Build Project Artifacts"
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      # Faz o upload dos artefatos pré-compilados diretamente para a infraestrutura de produção
       - name: "Deploy Project Artifacts to Vercel"
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:

@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Literal
 from datetime import datetime
 
-StatusAgendamento = Literal["pendente", "confirmado", "em_andamento", "concluido", "cancelado"]
+StatusAgendamento = Literal["pendente", "confirmado", "recusado", "em_andamento", "concluido", "cancelado"]
 
 class AgendamentoBase(BaseModel):
     estabelecimento_id: str = Field(..., description="ID do estabelecimento (UUID)")
@@ -19,6 +19,7 @@ class AgendamentoCreate(AgendamentoBase):
 
 class AgendamentoStatusUpdate(BaseModel):
     status: StatusAgendamento
+    motivo_recusa: Optional[str] = Field(None, description="Motivo da recusa, se aplicável")
 
 # Estrutura para a avaliação final mútua exigida no encerramento
 class AvaliacaoEncerramento(BaseModel):
@@ -41,6 +42,7 @@ class AgendamentoResponse(BaseModel):
     data_hora_inicio: datetime
     duracao_estimada_minutos: int
     status: StatusAgendamento
+    motivo_recusa: Optional[str] = None
     custo_final: float = 0.0
     criado_em: datetime
 

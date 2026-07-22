@@ -3,6 +3,7 @@ from app.schemas.estabelecimento import EstabelecimentoCreate, EstabelecimentoRe
 from app.core.config import supabase_client
 from postgrest.exceptions import APIError
 from typing import List, Optional
+from app.core.security import gerar_hash_senha
 
 router = APIRouter()
 
@@ -13,6 +14,9 @@ async def cadastrar_estabelecimento(estabelecimento: EstabelecimentoCreate):
     """
     try:
         dados_estabelecimento = estabelecimento.model_dump()
+        
+        # Gera o hash da senha
+        dados_estabelecimento["senha_hash"] = gerar_hash_senha(dados_estabelecimento["senha"])
         
         # Insere os dados na tabela 'estabelecimentos' do Supabase
         resposta = supabase_client.table("estabelecimentos").insert(dados_estabelecimento).execute()

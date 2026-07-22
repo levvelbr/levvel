@@ -1,8 +1,13 @@
-from fastapi import APIRouter, HTTPException, status
-from app.schemas.agendamento import AgendamentoCreate, AgendamentoResponse, AgendamentoStatusUpdate, AvaliacaoEncerramento
+from fastapi import APIRouter, HTTPException, status, Query
+from app.schemas.agendamento import (
+    AgendamentoCreate, 
+    AgendamentoResponse, 
+    AgendamentoStatusUpdate, 
+    AvaliacaoEncerramento
+)
 from app.core.config import supabase_client
 from postgrest.exceptions import APIError
-from typing import List
+from typing import List, Optional
 
 router = APIRouter()
 
@@ -25,15 +30,21 @@ async def criar_solicitacao_agendamento(agendamento: AgendamentoCreate):
     except APIError as error:
         raise HTTPException(status_code=400, detail=f"Erro no Supabase: {error.message}")
 
+
 @router.patch("/{agendamento_id}/status", response_model=AgendamentoResponse)
 async def atualizar_status_agendamento(agendamento_id: str, status_update: AgendamentoStatusUpdate):
     """
-    Atualiza o estado do agendamento (Ex: Estabelecimento aceita -> 'confirmado',
-    Ambos iniciam o tratamento -> 'em_andamento').
+    Atualiza o estado do agendamento (Ex: Aceitar -> 'confirmado', Recusar -> 'recusado', 
+    Iniciar -> 'em_andamento', Cancelar -> 'cancelado').
     """
     try:
+        # Prepara os dados de atualização incluindo motivo_recusa se fornecido
+        dados_atualizacao = {"status": status_update.status}
+        if status_update.motivo_recusa:
+            dados_atualizacao["motivo_recusa"] = status_update.motivo_recusa
+
         resposta = supabase_client.table("agendamentos")\
-            .update({"status": status_update.status})\
+            .update(dados_atualizacao)\
             .eq("id", agendamento_id).execute()
             
         if not resposta.data:
@@ -43,11 +54,15 @@ async def atualizar_status_agendamento(agendamento_id: str, status_update: Agend
     except APIError as error:
         raise HTTPException(status_code=400, detail=f"Erro no Supabase: {error.message}")
 
+
 @router.post("/{agendamento_id}/encerrar", response_model=AgendamentoResponse)
-async def encerrar_tratamento(agendamento_id: str, avaliacao: AvaliacaoEncerramento, custo_final: float):
+async def encerrar_tratamento(
+    agendamento_id: str, 
+    avaliacao: AvaliacaoEncerramento,
+    custo_final: float = Query(..., description="Custo final cobrado do atendimento")
+):
     """
-    Registra as avaliações mútuas, computa o custo final e encerra definitivamente o tratamento,
-    liberando o horário na agenda do profissional.
+    Registra as avaliações mútuas, computa o custo final e encerra definitivamente o tratamento.
     """
     try:
         dados_encerramento = {
@@ -70,11 +85,24 @@ async def encerrar_tratamento(agendamento_id: str, avaliacao: AvaliacaoEncerrame
     except APIError as error:
         raise HTTPException(status_code=400, detail=f"Erro no Supabase: {error.message}")
 
+
 @router.get("/estabelecimento/{estabelecimento_id}", response_model=List[AgendamentoResponse])
-async def listar_agenda_estabelecimento(estabelecimento_id: str):
-    """Retorna todos os compromissos agendados de um estabelecimento específico."""
-    resposta = supabase_client.table("agendamentos").select("*").eq("estabelecimento_id", estabelecimento_id).execute()
+async def listar_agenda_estabelecimento(
+    estabelecimento_id: str,
+    status_filtro: Optional[str] = Query(None, alias="status", description="Filtrar por status ex: 'pendente', 'confirmado'")
+):
+    """
+    Retorna os compromissos agendados do estabelecimento. 
+    Permite filtrar por status via query params: /estabelecimento/UUID?status=pendente
+    """
+    query = supabase_client.table("agendamentos").select("*").eq("estabelecimento_id", estabelecimento_id)
+    
+    if status_filtro:
+        query = query.eq("status", status_filtro)
+        
+    resposta = query.execute()
     return resposta.data
+
 
 @router.get("/cliente/{cliente_id}", response_model=List[AgendamentoResponse])
 async def listar_historico_cliente(cliente_id: str):

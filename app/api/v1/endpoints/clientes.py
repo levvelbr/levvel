@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.schemas.cliente import ClienteCreate, ClienteResponse
 from app.core.config import supabase_client
 from postgrest.exceptions import APIError
+from app.core.security import gerar_hash_senha
 
 router = APIRouter()
 
@@ -13,6 +14,9 @@ async def cadastrar_cliente(cliente: ClienteCreate):
     try:
         # Converte o schema Pydantic em um dicionário Python pronto para o banco
         dados_cliente = cliente.model_dump()
+        
+        # Gera o hash da senha
+        dados_cliente["senha"] = gerar_hash_senha(dados_cliente["senha"])
         
         # Insere na tabela 'clientes' do Supabase
         resposta = supabase_client.table("clientes").insert(dados_cliente).execute()

@@ -15,6 +15,7 @@ class ClienteBase(BaseModel):
 
 # Schema para quando o desenvolvedor do Front-end for criar um novo cliente (POST)
 class ClienteCreate(ClienteBase):
+    senha: str = Field(..., min_length=6, description="Senha para login do cliente")
     pass
 
 # Schema de resposta que a API devolve para o Front-end (inclui dados gerados pelo Supabase)

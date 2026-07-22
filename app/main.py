@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.endpoints import clientes, estabelecimentos, agendamentos  # Adicionado estabelecimentos
+from app.api.v1.endpoints import clientes, estabelecimentos, agendamentos, auth  # Adicionado estabelecimentos
 
 app = FastAPI(
     title="Levvel API",
@@ -26,6 +26,8 @@ app.add_middleware(
 app.include_router(clientes.router, prefix="/v1/clientes", tags=["Clientes"])
 app.include_router(estabelecimentos.router, prefix="/v1/estabelecimentos", tags=["Estabelecimentos"])
 app.include_router(agendamentos.router, prefix="/v1/agendamentos", tags=["Agendamentos"])
+app.include_router(auth.router, prefix="/v1/auth", tags=["Autenticação"])
+
 
 @app.get("/", tags=["Root"])
 async def root():

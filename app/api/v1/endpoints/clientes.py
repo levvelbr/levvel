@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
+from pydantic import json
 from app.schemas.cliente import ClienteCreate, ClienteResponse
 from app.core.config import supabase_client
 from postgrest.exceptions import APIError
@@ -15,7 +16,7 @@ async def cadastrar_cliente(cliente: ClienteCreate):
     """
     try:
         # Converte o schema em dicionário
-        dados_cliente = cliente.model_dump()
+        dados_cliente = cliente.model_dump(mode="json")
         
         # 2. Remove a senha em texto puro do dicionário antes de enviar ao Supabase!
         senha_pura = dados_cliente.pop("senha") 

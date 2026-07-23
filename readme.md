@@ -24,7 +24,7 @@ levvel-backend/
 │   ├── main.py                 # Inicialização da API, middlewares de CORS e roteadores
 │   ├── core/
 │   │   ├── config.py  
-|       └── security.py         # Gerenciamento de variáveis de ambiente e cliente Supabase
+|   |    └── security.py         # Gerenciamento de variáveis de ambiente e cliente Supabase
 │   ├── api/
 │   │   └── v1/
 │   │       └── endpoints/      # Controladores de rotas divididos por regras de negócio

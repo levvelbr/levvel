@@ -23,7 +23,8 @@ levvel-backend/
 ├── app/
 │   ├── main.py                 # Inicialização da API, middlewares de CORS e roteadores
 │   ├── core/
-│   │   └── config.py           # Gerenciamento de variáveis de ambiente e cliente Supabase
+│   │   ├── config.py  
+|       └── security.py         # Gerenciamento de variáveis de ambiente e cliente Supabase
 │   ├── api/
 │   │   └── v1/
 │   │       └── endpoints/      # Controladores de rotas divididos por regras de negócio
@@ -84,12 +85,14 @@ uvicorn app.main:app --reload
 ## 📖 Documentação para o Front-end (Vite / Vue)
 O FastAPI gera a documentação dos endpoints automaticamente. Com o servidor rodando, acesse a interface interativa para visualizar todos os payloads (JSON) de entrada e saída esperados:
 
-Swagger UI (Recomendado): http://localhost:8000/docs
+Swagger UI (Recomendado): https://levvel.onrender.com/docs
 
 ## 🔒 Configurações de CORS Ativas
 A API está explicitamente configurada para aceitar requisições originadas de:
 
 http://localhost:5173 (Porta padrão do Vite)
+
+https://levvel.onrender.com (API Render)
 
 http://127.0.0.1:5173
 

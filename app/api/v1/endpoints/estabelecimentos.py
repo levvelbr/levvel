@@ -16,7 +16,7 @@ async def cadastrar_estabelecimento(estabelecimento: EstabelecimentoCreate):
         dados_estabelecimento = estabelecimento.model_dump()
         
         # Gera o hash da senha
-        dados_estabelecimento["senha_hash"] = gerar_hash_senha(dados_estabelecimento["senha"])
+        dados_estabelecimento["senha_hash"] = gerar_hash_senha(dados_estabelecimento["senha_hash"])
         
         # Insere os dados na tabela 'estabelecimentos' do Supabase
         resposta = supabase_client.table("estabelecimentos").insert(dados_estabelecimento).execute()

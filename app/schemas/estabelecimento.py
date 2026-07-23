@@ -36,7 +36,7 @@ class EstabelecimentoBase(BaseModel):
     horario_funcionamento: Dict[str, Any] = {}
 
 class EstabelecimentoCreate(EstabelecimentoBase):
-    senha: str = Field(..., min_length=6, description="Senha para login do estabelecimento")
+    senha_hash: str = Field(..., min_length=6, description="Senha para login do estabelecimento")
     pass
 
 class EstabelecimentoResponse(EstabelecimentoBase):

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
-from app.core.security import verificar_senha
+from app.core.security import criar_token_acesso, verificar_senha
 from app.schemas.role import UserRole, LoginSchema, UserSessionResponse
 from app.core.config import supabase_client
 from postgrest.exceptions import APIError
@@ -29,13 +29,15 @@ async def login(payload: LoginSchema):
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Senha incorreta para o estabelecimento."
                 )
+                
+            token_real = criar_token_acesso({"sub": est["id"], "role": UserRole.ESTABELECIMENTO.value, "email_ou_cpf": est["email"]})
             
             return UserSessionResponse(
                 id=est["id"],
                 role=UserRole.ESTABELECIMENTO,
                 nome=est["nome_estabelecimento"],
                 email_ou_cpf=est["email"],
-                access_token=f"fake-jwt-token-{est['id']}" # Token para integração no front
+                access_token=token_real
             )
 
         # 2. Se não achou, tenta encontrar em Clientes (por CPF ou Nome)
@@ -46,12 +48,13 @@ async def login(payload: LoginSchema):
 
         if cli_query.data:
             cli = cli_query.data[0]
+            token_real = criar_token_acesso({"sub": cli["id"], "role": UserRole.CLIENTE.value, "email_ou_cpf": cli["cpf"]})
             return UserSessionResponse(
                 id=cli["id"],
                 role=UserRole.CLIENTE,
                 nome=cli.get("nome_tratamento") or cli["nome_usuario"],
                 email_ou_cpf=cli["cpf"],
-                access_token=f"fake-jwt-token-{cli['id']}"
+                access_token=token_real
             )
 
         # 3. Não encontrou em nenhuma tabela

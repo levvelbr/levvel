@@ -8,6 +8,7 @@ FormaPagamento = Literal["dinheiro", "cartao_debito", "cartao_credito", "pix"]
 class ClienteBase(BaseModel):
     nome_usuario: str = Field(..., min_length=3, description="Nome completo do usuário")
     nome_tratamento: Optional[str] = Field(None, description="Como o cliente prefere ser chamado")
+    foto_perfil_url: Optional[str] = Field(None, description="URL pública da foto de perfil")
     cpf: str = Field(..., min_length=11, max_length=14, description="Documento CPF do cliente")
     data_nascimento: date = Field(..., description="Data de nascimento do usuário (formato YYYY-MM-DD)")
     genero: Optional[str] = Field(None, description="Gênero do usuário")
@@ -34,6 +35,35 @@ class ClienteBase(BaseModel):
 # Schema para quando o desenvolvedor do Front-end for criar um novo cliente (POST)
 class ClienteCreate(ClienteBase):
     senha: str = Field(..., min_length=6, description="Senha para login do cliente")
+    
+class ClienteUpdate(BaseModel):
+    nome_tratamento: Optional[str] = Field(None, description="Como o cliente prefere ser chamado")
+    genero: Optional[str] = Field(None, description="Gênero do usuário")
+    forma_pagamento_preferida: Optional[FormaPagamento] = Field(None, description="Forma de pagamento padrão")
+    localizacao_inicial: Optional[str] = Field(None, description="Localização inicial informada no cadastro")
+    senha: Optional[str] = Field(None, min_length=6, description="Nova senha para login do cliente")
+    foto_perfil_url: Optional[str] = Field(None, description="URL pública da foto de perfil")
+    
+
+class ClientePerfilResponse(BaseModel):
+    id: str = Field(..., description="ID do cliente (UUID)")
+    nome_usuario: str = Field(..., description="Nome completo do usuário")
+    nome_tratamento: Optional[str] = Field(None, description="Como o cliente prefere ser chamado")
+    cpf: str = Field(..., description="Documento CPF do cliente")
+    data_nascimento: date = Field(..., description="Data de nascimento do usuário (formato YYYY-MM-DD)")
+    genero: Optional[str] = Field(None, description="Gênero do usuário")
+    
+    # AJUSTE AQUI: Deixe Optional para evitar que o Pydantic lance ValidationError caso venha None
+    forma_pagamento_preferida: Optional[FormaPagamento] = Field(None, description="Forma de pagamento padrão")
+    localizacao_inicial: Optional[str] = Field(None, description="Localização inicial informada no cadastro")
+    
+    # Campo da Foto
+    foto_perfil_url: Optional[str] = Field(None, description="URL pública da foto de perfil")
+    
+    criado_em: str = Field(..., description="Timestamp de criação do registro")
+
+    class Config:
+        from_attributes = True
 
 # Schema de resposta que a API devolve para o Front-end (inclui dados gerados pelo Supabase)
 class ClienteResponse(ClienteBase):

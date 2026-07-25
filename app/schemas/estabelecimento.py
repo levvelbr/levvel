@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from uuid import UUID
@@ -19,6 +19,7 @@ class EstabelecimentoBase(BaseModel):
     telefone: str
     email: EmailStr
     localizacao: str
+    foto_estabelecimento_url: Optional[str] = Field(None, description="URL pública da foto do estabelecimento")
     
     # Novos campos úteis
     cnpj: Optional[str] = None
@@ -38,6 +39,39 @@ class EstabelecimentoBase(BaseModel):
 class EstabelecimentoCreate(EstabelecimentoBase):
     senha_hash: str = Field(..., min_length=6, description="Senha para login do estabelecimento")
     pass
+
+class EstabelecimentoUpdate(BaseModel):
+    nome_estabelecimento: Optional[str] = Field(None, min_length=2, description="Nome Fantasia")
+    responsavel: Optional[str] = Field(None, min_length=2)
+    telefone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    localizacao: Optional[str] = None
+    foto_estabelecimento_url: Optional[str] = Field(None, description="URL pública da foto do estabelecimento")
+    
+    # Novos campos úteis
+    cnpj: Optional[str] = None
+    razao_social: Optional[str] = None
+    categoria: Optional[str] = None
+    instagram: Optional[str] = None
+    
+    # Listas/Arrays no Postgres
+    servicos_oferecidos: Optional[List[str]] = None
+    tecnicas_utilizadas: Optional[List[str]] = None
+    produtos_aplicados: Optional[List[str]] = None
+    profissionais_envolvidos: Optional[List[str]] = None
+    
+    # JSONB
+    horario_funcionamento: Optional[Dict[str, Any]] = None
+    
+    @field_validator('*', mode='before')
+    def empty_string_to_none(cls, v):
+        """
+        Converte strings vazias para None antes da validação.
+        Isso é útil para campos opcionais que podem ser enviados como "".
+        """
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
 class EstabelecimentoResponse(EstabelecimentoBase):
     id: UUID

@@ -48,11 +48,6 @@ def get_usuario_logado(credentials: HTTPAuthorizationCredentials = Depends(secur
     Decodifica o token JWT e retorna os dados do usuário logado.
     """
     token = credentials.credentials
-    # exception_unauthorized = HTTPException(
-    #     status_code=status.HTTP_401_UNAUTHORIZED,
-    #     detail="Token inválido ou expirado.",
-    #     headers={"WWW-Authenticate": "Bearer"},
-    # )
     
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -63,3 +58,4 @@ def get_usuario_logado(credentials: HTTPAuthorizationCredentials = Depends(secur
             detail="Token inválido ou expirado.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    

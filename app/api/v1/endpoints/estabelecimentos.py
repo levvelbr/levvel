@@ -46,7 +46,7 @@ async def cadastrar_estabelecimento(estabelecimento: EstabelecimentoCreate):
             detail=f"Erro no Supabase: {error.message}"
         )
 
-@router.get("/", response_model=List[EstabelecimentoResponse])
+@router.get("/listar_estabelecimentos", response_model=List[EstabelecimentoResponse])
 async def listar_estabelecimentos(categoria: Optional[str] = None):
     """
     Lista todos os estabelecimentos. Permite filtros por categoria ou serviço.

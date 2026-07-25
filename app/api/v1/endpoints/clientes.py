@@ -87,7 +87,7 @@ async def obter_perfil_cliente_autenticado(usuario_logado: dict = Depends(get_us
     return resposta.data[0]
 
 
-@router.patch("/me", response_model=ClientePerfilResponse)
+@router.patch("/me/update", response_model=ClientePerfilResponse)
 async def atualizar_perfil_cliente(
     cliente_atualizado: ClienteUpdate, 
     usuario_logado: dict = Depends(get_usuario_logado)

@@ -35,12 +35,14 @@ class ClienteBase(BaseModel):
 # Schema para quando o desenvolvedor do Front-end for criar um novo cliente (POST)
 class ClienteCreate(ClienteBase):
     senha: str = Field(..., min_length=6, description="Senha para login do cliente")
+    email: EmailStr = Field(..., description="Email do cliente para login e comunicação")
     
 class ClienteUpdate(BaseModel):
     nome_tratamento: Optional[str] = Field(None, description="Como o cliente prefere ser chamado")
     genero: Optional[str] = Field(None, description="Gênero do usuário")
     forma_pagamento_preferida: Optional[FormaPagamento] = Field(None, description="Forma de pagamento padrão")
     localizacao_inicial: Optional[str] = Field(None, description="Localização inicial informada no cadastro")
+    email: Optional[EmailStr] = Field(None, description="Email do cliente para login e comunicação")
     senha: Optional[str] = Field(None, min_length=6, description="Nova senha para login do cliente")
     foto_perfil_url: Optional[str] = Field(None, description="URL pública da foto de perfil")
     
@@ -52,7 +54,7 @@ class ClientePerfilResponse(BaseModel):
     cpf: str = Field(..., description="Documento CPF do cliente")
     data_nascimento: date = Field(..., description="Data de nascimento do usuário (formato YYYY-MM-DD)")
     genero: Optional[str] = Field(None, description="Gênero do usuário")
-    
+    email: Optional[EmailStr] = Field(None, description="Email do cliente para login e comunicação")
     # AJUSTE AQUI: Deixe Optional para evitar que o Pydantic lance ValidationError caso venha None
     forma_pagamento_preferida: Optional[FormaPagamento] = Field(None, description="Forma de pagamento padrão")
     localizacao_inicial: Optional[str] = Field(None, description="Localização inicial informada no cadastro")
@@ -69,6 +71,7 @@ class ClientePerfilResponse(BaseModel):
 class ClienteResponse(ClienteBase):
     id: str = Field(..., description="ID gerado automaticamente pelo banco (UUID)")
     criado_em: str = Field(..., description="Timestamp de criação do registro")
+    email: Optional[EmailStr] = Field(None, description="Email do cliente para login e comunicação")
 
     class Config:
         from_attributes = True

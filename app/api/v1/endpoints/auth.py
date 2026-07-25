@@ -43,17 +43,17 @@ async def login(payload: LoginSchema):
         # 2. Se não achou, tenta encontrar em Clientes (por CPF ou Nome)
         cli_query = supabase_client.table("clientes")\
             .select("*")\
-            .or_(f"cpf.eq.{identificador},nome_usuario.eq.{identificador}")\
+            .or_(f"email.eq.{identificador},cpf.eq.{identificador},nome_usuario.eq.{identificador}")\
             .execute()
 
         if cli_query.data:
             cli = cli_query.data[0]
-            token_real = criar_token_acesso({"sub": cli["id"], "role": UserRole.CLIENTE.value, "email_ou_cpf": cli["cpf"]})
+            token_real = criar_token_acesso({"sub": cli["id"], "role": UserRole.CLIENTE.value, "email_ou_cpf": cli["cpf"] or cli["email"]})
             return UserSessionResponse(
                 id=cli["id"],
                 role=UserRole.CLIENTE,
                 nome=cli.get("nome_tratamento") or cli["nome_usuario"],
-                email_ou_cpf=cli["cpf"],
+                email_ou_cpf=cli["cpf"] or cli["email"],
                 access_token=token_real
             )
 

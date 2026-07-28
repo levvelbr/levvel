@@ -101,8 +101,14 @@ export const LoginForm = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-3 py-4 sm:px-4">
-      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl sm:p-6">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-3 py-4 sm:px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl sm:p-6"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-emerald-900">Entrar</h2>

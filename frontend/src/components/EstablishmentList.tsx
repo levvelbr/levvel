@@ -9,6 +9,7 @@ interface Establishment {
   telefone: string;
   email: string;
   localizacao: string;
+  foto_estabelecimento_url: string | null;
   cnpj: string;
   razao_social: string;
   categoria: string;
@@ -119,11 +120,14 @@ export const EstablishmentList = ({
           {filteredEstablishments.map((establishment) => (
             <EstablishmentCard
               key={establishment.id}
+              id={establishment.id}
               nome_estabelecimento={establishment.nome_estabelecimento}
               telefone={establishment.telefone}
               localizacao={establishment.localizacao}
+              foto_estabelecimento_url={
+                establishment.foto_estabelecimento_url ?? null
+              }
               categoria={establishment.categoria}
-              cnpj={establishment.cnpj}
               servicos_oferecidos={establishment.servicos_oferecidos ?? []}
               tecnicas_utilizadas={establishment.tecnicas_utilizadas ?? []}
               produtos_aplicados={establishment.produtos_aplicados ?? []}

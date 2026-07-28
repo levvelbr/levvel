@@ -9,9 +9,7 @@ export const LoginPage = () => {
 
   const fromState = (location.state as { from?: string } | null)?.from;
   const from =
-    typeof fromState === "string" && fromState !== "/login"
-      ? fromState
-      : "/app";
+    typeof fromState === "string" && fromState !== "/login" ? fromState : "/";
 
   return (
     <div className="min-h-screen bg-slate-50">

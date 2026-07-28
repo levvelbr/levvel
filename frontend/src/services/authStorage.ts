@@ -1,6 +1,15 @@
 import type { UserSession } from "../types/auth";
 
 const AUTH_SESSION_KEY = "authSession";
+export const AUTH_SESSION_CHANGED_EVENT = "auth-session-changed";
+
+const notifySessionChanged = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
+};
 
 export const getStoredSession = (): UserSession | null => {
   if (typeof window === "undefined") {
@@ -46,6 +55,7 @@ export const setStoredSession = (session: UserSession) => {
   }
 
   window.localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+  notifySessionChanged();
 };
 
 export const clearStoredSession = () => {
@@ -54,4 +64,5 @@ export const clearStoredSession = () => {
   }
 
   window.localStorage.removeItem(AUTH_SESSION_KEY);
+  notifySessionChanged();
 };

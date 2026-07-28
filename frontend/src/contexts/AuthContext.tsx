@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  AUTH_SESSION_CHANGED_EVENT,
   clearStoredSession,
   getStoredSession,
   setStoredSession,
@@ -32,12 +33,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   );
 
   useEffect(() => {
-    const handleStorageChange = () => {
+    const syncSession = () => {
       setSession(getStoredSession());
     };
 
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    window.addEventListener("storage", syncSession);
+    window.addEventListener(AUTH_SESSION_CHANGED_EVENT, syncSession);
+
+    return () => {
+      window.removeEventListener("storage", syncSession);
+      window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, syncSession);
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(() => {

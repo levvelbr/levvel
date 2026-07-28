@@ -1,9 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AppLayout } from "./layouts/AppLayout";
-import { AppHomePage } from "./pages/AppHomePage";
 import { ClientBookingPage } from "./pages/ClientBookingPage";
 import { EstablishmentAgendaPage } from "./pages/EstablishmentAgendaPage";
+import { EstablishmentPublicPage } from "./pages/EstablishmentPublicPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
@@ -17,11 +17,15 @@ export const App = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/estabelecimentos/:id"
+            element={<EstablishmentPublicPage />}
+          />
           <Route path="/nao-autorizado" element={<UnauthorizedPage />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="/app" element={<AppLayout />}>
-              <Route index element={<AppHomePage />} />
+              <Route index element={<Navigate to="/" replace />} />
 
               <Route element={<RoleRoute allowedRoles={["cliente"]} />}>
                 <Route

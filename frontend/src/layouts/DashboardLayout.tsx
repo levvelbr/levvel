@@ -2,6 +2,7 @@ import {
   Children,
   cloneElement,
   isValidElement,
+  useRef,
   useEffect,
   useMemo,
   useState,
@@ -39,7 +40,9 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [showHeaderSearch, setShowHeaderSearch] = useState(false);
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
+  const heroSearchRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const fetchEstablishments = async () => {
@@ -69,6 +72,25 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
         `${window.location.pathname}${window.location.search}`,
       );
     }
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const searchElement = heroSearchRef.current;
+
+      if (!searchElement) {
+        setShowHeaderSearch(false);
+        return;
+      }
+
+      const rect = searchElement.getBoundingClientRect();
+      setShowHeaderSearch(rect.bottom <= 80);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const handleScrollToSection = (sectionId: string) => {
@@ -176,6 +198,9 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
         loggedClientName={session?.nome ?? null}
         onOpenLogin={() => setIsAuthModalOpen(true)}
         onLogout={logout}
+        showSearchBar={showHeaderSearch}
+        searchQuery={searchQuery}
+        onSearch={setSearchQuery}
       />
 
       <AuthModal
@@ -185,11 +210,6 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
           if (nextSession) {
             login(nextSession);
             setIsAuthModalOpen(false);
-            navigate(
-              nextSession.role === "estabelecimento"
-                ? "/app/agenda"
-                : "/app/agendamentos/novo",
-            );
           }
         }}
       />
@@ -232,12 +252,14 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
               </button>
             </div>
 
-            <SearchBar
-              className="mt-8 max-w-5xl mx-auto"
-              onSearch={(query) => setSearchQuery(query)}
-            />
+            <div
+              ref={heroSearchRef}
+              className="mx-auto mt-8 max-w-5xl hidden md:block"
+            >
+              <SearchBar value={searchQuery} onSearch={setSearchQuery} />
+            </div>
 
-            <div className="mt-10 mx-auto max-w-5/6">
+            <div className="mt-10 mb-5 mx-auto max-w-5/6">
               <h2
                 className="text-2xl md:text-3xl font-serif font-semibold text-emerald-900 mb-2"
                 id="categories-title"

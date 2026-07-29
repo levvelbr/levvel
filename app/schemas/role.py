@@ -17,3 +17,4 @@ class UserSessionResponse(BaseModel):
     email_ou_cpf: str
     access_token: str
     token_type: str = "bearer"
+    foto_perfil_url: Optional[str] = Field(None, description="URL pública da foto de perfil do usuário (cliente ou estabelecimento)") 

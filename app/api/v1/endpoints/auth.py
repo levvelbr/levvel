@@ -37,7 +37,8 @@ async def login(payload: LoginSchema):
                 role=UserRole.ESTABELECIMENTO,
                 nome=est["nome_estabelecimento"],
                 email_ou_cpf=est["email"],
-                access_token=token_real
+                access_token=token_real,
+                foto_perfil_url=est.get("foto_estabelecimento_url")
             )
 
         # 2. Se não achou, tenta encontrar em Clientes (por CPF ou Nome)

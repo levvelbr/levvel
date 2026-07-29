@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from supabase_auth import datetime
 from app.schemas import estabelecimento
-from app.schemas.estabelecimento import EstabelecimentoCreate, EstabelecimentoResponse, EstabelecimentoUpdate
+from app.schemas.estabelecimento import EstabelecimentoCreate, EstabelecimentoResponse, EstabelecimentoUpdate, EstabelecimentoPerfilResponse
 from app.core.config import supabase_client
 from postgrest.exceptions import APIError
 from typing import List, Optional
@@ -86,7 +86,7 @@ async def obter_perfil_estabelecimento(estabelecimento_id: str, usuario_logado: 
         
     return resposta.data[0]
 
-@router.get("/me", response_model=EstabelecimentoResponse)
+@router.get("/me", response_model=EstabelecimentoPerfilResponse)
 async def obter_perfil_estabelecimento_autenticado(usuario_logado: dict = Depends(get_usuario_logado)):
     """
     Retorna os dados do perfil do estabelecimento autenticado.
@@ -110,7 +110,7 @@ async def obter_perfil_estabelecimento_autenticado(usuario_logado: dict = Depend
     return resposta.data[0]
 
 
-@router.patch("/me/update", response_model=EstabelecimentoResponse)
+@router.patch("/me/update", response_model=EstabelecimentoPerfilResponse)
 async def atualizar_perfil_estabelecimento(
     estabelecimento_atualizado: EstabelecimentoUpdate, 
     usuario_logado: dict = Depends(get_usuario_logado)
@@ -153,7 +153,7 @@ async def atualizar_perfil_estabelecimento(
         )
 
 
-@router.post("/me/foto-perfil", response_model=EstabelecimentoResponse)
+@router.post("/me/foto-perfil", response_model=EstabelecimentoPerfilResponse)
 async def upload_foto_perfil_estabelecimento(
     file: UploadFile = File(...),
     usuario_logado: dict = Depends(get_usuario_logado)

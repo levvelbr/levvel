@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import AliasChoices, BaseModel, EmailStr, Field, field_validator
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from uuid import UUID
@@ -72,11 +72,26 @@ class EstabelecimentoUpdate(BaseModel):
         if isinstance(v, str) and v.strip() == "":
             return None
         return v
+    
+class EstabelecimentoPerfilResponse(BaseModel):
+    id: str = Field(..., description="ID do estabelecimento (UUID)")
+    nome_estabelecimento: str = Field(..., description="Nome completo do estabelecimento")
+    responsavel: str = Field(..., description="Nome do responsável pelo estabelecimento")
+    telefone: str = Field(..., description="Telefone do estabelecimento")
+    email: EmailStr = Field(..., description="Email do estabelecimento para login e comunicação")
+    localizacao: str = Field(..., description="Localização do estabelecimento")
+    # Campo da Foto
+    foto_estabelecimento_url: Optional[str] = Field(None, description="URL pública da foto do estabelecimento")
+    
+    criado_em: str = Field(..., description="Timestamp de criação do registro")
+
+    class Config:
+        from_attributes = True
 
 class EstabelecimentoResponse(EstabelecimentoBase):
     id: UUID
     ativo: bool = True
-    criado_em: datetime
+    criado_em: datetime    
 
     class Config:
         from_attributes = True

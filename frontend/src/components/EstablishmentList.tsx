@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 import EstablishmentCard from "./EstablishmentCard";
+import type { BookingEstablishment } from "./BookingForm";
 
 interface Establishment {
   id: string;
@@ -26,13 +27,13 @@ interface Establishment {
 interface EstablishmentListProps {
   selectedCategory?: string | null;
   searchQuery?: string;
-  onRequestLogin?: () => void;
+  onRequestBooking?: (data: BookingEstablishment) => void;
 }
 
 export const EstablishmentList = ({
   selectedCategory,
   searchQuery,
-  onRequestLogin,
+  onRequestBooking,
 }: EstablishmentListProps) => {
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -134,7 +135,7 @@ export const EstablishmentList = ({
               profissionais_envolvidos={
                 establishment.profissionais_envolvidos ?? []
               }
-              onRequestLogin={() => onRequestLogin?.()}
+              onRequestBooking={(data) => onRequestBooking?.(data)}
             />
           ))}
         </div>

@@ -1,6 +1,7 @@
 import CategoryIcon from "./CategoryIcon";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import type { BookingEstablishment } from "./BookingForm";
 
 interface EstablishmentCardProps {
   id: string;
@@ -13,7 +14,7 @@ interface EstablishmentCardProps {
   tecnicas_utilizadas: string[];
   produtos_aplicados: string[];
   profissionais_envolvidos: string[];
-  onRequestLogin: () => void;
+  onRequestBooking: (data: BookingEstablishment) => void;
 }
 
 export const EstablishmentCard = ({
@@ -24,10 +25,13 @@ export const EstablishmentCard = ({
   foto_estabelecimento_url,
   categoria,
   servicos_oferecidos,
-  onRequestLogin,
+  tecnicas_utilizadas,
+  produtos_aplicados,
+  profissionais_envolvidos,
+  onRequestBooking,
 }: EstablishmentCardProps) => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, session } = useAuth();
   const services = servicos_oferecidos.length
     ? servicos_oferecidos
     : ["Serviço a confirmar pelo estabelecimento"];
@@ -107,36 +111,46 @@ export const EstablishmentCard = ({
           </p>
         </div>
 
-        {isAuthenticated ? (
+        {isAuthenticated && session?.role === "cliente" ? (
           <button
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              onRequestLogin();
+              onRequestBooking({
+                id,
+                nome_estabelecimento,
+                profissionais_envolvidos,
+                servicos_oferecidos,
+                tecnicas_utilizadas,
+                produtos_aplicados,
+              });
             }}
-            className="w-full rounded-md bg-emerald-700 cursor-pointer px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
+            className="w-full cursor-pointer rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
           >
             Solicitar agendamento
           </button>
-        ) : (
-          <div className="flex gap-2 items-center justify-around rounded-2xl border border-amber-200 bg-amber-50 p-3">
+        ) : isAuthenticated && session?.role === "estabelecimento" ? null : (
+          <div className="flex items-center justify-around gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3">
             <p className="text-xs leading-relaxed text-amber-900">
-              Agendamento indisponível sem cadastro. Para solicitar agendamento
-              faça login.
+              Entre na sua conta para solicitar um agendamento.
             </p>
-
-            <div className="flex items-center justify-end">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRequestLogin();
-                }}
-                className="w-fit rounded-md bg-emerald-700 cursor-pointer px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-emerald-800 sm:w-auto"
-              >
-                Solicitar agendamento
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRequestBooking({
+                  id,
+                  nome_estabelecimento,
+                  profissionais_envolvidos,
+                  servicos_oferecidos,
+                  tecnicas_utilizadas,
+                  produtos_aplicados,
+                });
+              }}
+              className="w-fit shrink-0 cursor-pointer rounded-md bg-emerald-700 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-emerald-800"
+            >
+              Entrar
+            </button>
           </div>
         )}
       </div>

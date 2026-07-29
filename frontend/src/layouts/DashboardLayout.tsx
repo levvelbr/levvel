@@ -14,6 +14,8 @@ import { AuthModal } from "../components/AuthModal";
 import { useAuth } from "../contexts/AuthContext";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
+import { BookingModal } from "../components/BookingModal";
+import type { BookingEstablishment } from "../components/BookingForm";
 import SearchBar from "../components/SearchBar";
 import api from "../services/api";
 
@@ -42,6 +44,10 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [showHeaderSearch, setShowHeaderSearch] = useState(false);
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
+  const [bookingEstablishment, setBookingEstablishment] =
+    useState<BookingEstablishment | null>(null);
+  const [pendingEstablishment, setPendingEstablishment] =
+    useState<BookingEstablishment | null>(null);
   const heroSearchRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -169,22 +175,22 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
       child as ReactElement<{
         selectedCategory?: string | null;
         searchQuery?: string;
-        onRequestLogin?: () => void;
+        onRequestBooking?: (data: BookingEstablishment) => void;
       }>,
       {
         selectedCategory: activeCategory,
         searchQuery,
-        onRequestLogin: () => {
+        onRequestBooking: (est: BookingEstablishment) => {
           if (!isAuthenticated) {
+            setPendingEstablishment(est);
             setIsAuthModalOpen(true);
             return;
           }
-
-          navigate(
-            session?.role === "estabelecimento"
-              ? "/app/agenda"
-              : "/app/agendamentos/novo",
-          );
+          if (session?.role === "estabelecimento") {
+            navigate("/perfil");
+            return;
+          }
+          setBookingEstablishment(est);
         },
       },
     );
@@ -210,8 +216,18 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
           if (nextSession) {
             login(nextSession);
             setIsAuthModalOpen(false);
+            if (nextSession.role === "cliente" && pendingEstablishment) {
+              setBookingEstablishment(pendingEstablishment);
+            }
+            setPendingEstablishment(null);
           }
         }}
+      />
+
+      <BookingModal
+        isOpen={Boolean(bookingEstablishment)}
+        onClose={() => setBookingEstablishment(null)}
+        establishment={bookingEstablishment}
       />
 
       {/* Passamos o estado e a função de fechar para o Sidebar */}

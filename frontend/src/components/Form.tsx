@@ -9,6 +9,7 @@ interface FormValues {
   telefone: string;
   email: string;
   localizacao: string;
+  foto_estabelecimento_url: string;
   cnpj: string;
   razao_social: string;
   categoria: string;
@@ -37,6 +38,7 @@ const initialFormValues: FormValues = {
   telefone: "",
   email: "",
   localizacao: "",
+  foto_estabelecimento_url: "",
   cnpj: "",
   razao_social: "",
   categoria: "Geral",
@@ -198,6 +200,7 @@ export const Form = () => {
       telefone: values.telefone.trim(),
       email: values.email.trim(),
       localizacao: values.localizacao.trim(),
+      foto_estabelecimento_url: values.foto_estabelecimento_url.trim() || null,
       cnpj: values.cnpj.trim(),
       razao_social: values.razao_social.trim(),
       categoria: values.categoria,
@@ -311,6 +314,18 @@ export const Form = () => {
                   {errors.responsavel}
                 </span>
               )}
+            </label>
+
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium text-slate-700">
+                URL da foto do estabelecimento (opcional)
+              </span>
+              <Input
+                name="foto_estabelecimento_url"
+                value={values.foto_estabelecimento_url}
+                onChange={handleChange}
+                placeholder="https://exemplo.com/foto.jpg"
+              />
             </label>
 
             <label className="space-y-2">

@@ -1,14 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
-import { AppLayout } from "./layouts/AppLayout";
-import { ClientBookingPage } from "./pages/ClientBookingPage";
-import { EstablishmentAgendaPage } from "./pages/EstablishmentAgendaPage";
 import { EstablishmentPublicPage } from "./pages/EstablishmentPublicPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
-import { RoleRoute } from "./routes/RoleRoute";
 
 export const App = () => {
   return (
@@ -24,20 +21,7 @@ export const App = () => {
           <Route path="/nao-autorizado" element={<UnauthorizedPage />} />
 
           <Route element={<ProtectedRoute />}>
-            <Route path="/app" element={<AppLayout />}>
-              <Route index element={<Navigate to="/" replace />} />
-
-              <Route element={<RoleRoute allowedRoles={["cliente"]} />}>
-                <Route
-                  path="agendamentos/novo"
-                  element={<ClientBookingPage />}
-                />
-              </Route>
-
-              <Route element={<RoleRoute allowedRoles={["estabelecimento"]} />}>
-                <Route path="agenda" element={<EstablishmentAgendaPage />} />
-              </Route>
-            </Route>
+            <Route path="/perfil" element={<ProfilePage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

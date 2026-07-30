@@ -130,7 +130,7 @@ export const EstablishmentCard = ({
             Solicitar agendamento
           </button>
         ) : isAuthenticated && session?.role === "estabelecimento" ? null : (
-          <div className="flex items-center justify-around gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+          <div className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3">
             <p className="text-xs leading-relaxed text-amber-900">
               Entre na sua conta para solicitar um agendamento.
             </p>
@@ -147,7 +147,7 @@ export const EstablishmentCard = ({
                   produtos_aplicados,
                 });
               }}
-              className="w-fit shrink-0 cursor-pointer rounded-md bg-emerald-700 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-emerald-800"
+              className="w-fit shrink-0 cursor-pointer rounded-md bg-emerald-700 px-10 py-1 text-xs font-semibold text-white transition-colors hover:bg-emerald-800"
             >
               Entrar
             </button>

@@ -5,6 +5,7 @@ import SearchBar from "./SearchBar";
 interface HeaderProps extends HTMLAttributes<HTMLElement> {
   onOpenMenu: () => void;
   loggedClientName: string | null;
+  loggedClientPhotoUrl?: string | null;
   onOpenLogin: () => void;
   onLogout: () => void;
   showSearchBar?: boolean;
@@ -12,9 +13,53 @@ interface HeaderProps extends HTMLAttributes<HTMLElement> {
   onSearch?: (query: string) => void;
 }
 
+interface UserAvatarProps {
+  name: string;
+  photoUrl?: string | null;
+}
+
+const UserAvatar = ({ name, photoUrl }: UserAvatarProps) => {
+  const normalizedName = name.trim();
+  const initial = normalizedName ? normalizedName.charAt(0).toUpperCase() : "?";
+
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt={`Foto de perfil de ${name}`}
+        className="h-7 w-7 rounded-full border border-emerald-100 object-cover"
+      />
+    );
+  }
+
+  return (
+    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-200 text-xs font-bold text-emerald-900">
+      {initial}
+    </span>
+  );
+};
+
+const BrandLink = () => {
+  return (
+    <Link
+      to="/"
+      className="flex items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-slate-100"
+      aria-label="Ir para a página inicial"
+    >
+      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-linear-to-br from-emerald-700 to-emerald-500 text-sm font-semibold text-white">
+        L
+      </span>
+      <span className="text-lg font-semibold tracking-tight text-slate-800">
+        LevveL
+      </span>
+    </Link>
+  );
+};
+
 export const Header = ({
   onOpenMenu,
   loggedClientName,
+  loggedClientPhotoUrl,
   onOpenLogin,
   onLogout,
   showSearchBar = false,
@@ -65,16 +110,7 @@ export const Header = ({
                 </svg>
               </button>
 
-              <div className="flex items-center gap-2">
-                <img
-                  src=""
-                  alt="Logo do sistema"
-                  className="h-8 w-8 rounded-md bg-slate-200 object-cover"
-                />
-                <span className="text-lg font-semibold tracking-tight text-slate-800">
-                  LevveL
-                </span>
-              </div>
+              <BrandLink />
             </div>
 
             <div />
@@ -85,8 +121,12 @@ export const Header = ({
                   <button
                     type="button"
                     onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                    className="flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800"
+                    className="flex items-center gap-2 rounded-md bg-emerald-50 px-2 py-2 text-sm font-semibold text-emerald-800"
                   >
+                    <UserAvatar
+                      name={loggedClientName}
+                      photoUrl={loggedClientPhotoUrl}
+                    />
                     <span className="max-w-24 truncate sm:max-w-none">
                       {loggedClientName}
                     </span>
@@ -225,16 +265,7 @@ export const Header = ({
               </svg>
             </button>
 
-            <div className="flex items-center gap-2">
-              <img
-                src=""
-                alt="Logo do sistema"
-                className="h-8 w-8 rounded-md bg-slate-200 object-cover"
-              />
-              <span className="text-lg font-semibold tracking-tight text-slate-800">
-                LevveL
-              </span>
-            </div>
+            <BrandLink />
           </div>
 
           <div className="hidden md:flex md:justify-center">
@@ -260,8 +291,12 @@ export const Header = ({
                 <button
                   type="button"
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-1 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800"
+                  className="flex items-center gap-2 rounded-md bg-emerald-50 px-2 py-2 text-sm font-semibold text-emerald-800"
                 >
+                  <UserAvatar
+                    name={loggedClientName}
+                    photoUrl={loggedClientPhotoUrl}
+                  />
                   <span className="max-w-24 truncate sm:max-w-none">
                     {loggedClientName}
                   </span>

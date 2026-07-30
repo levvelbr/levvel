@@ -40,15 +40,27 @@ export const LoginForm = ({
     setError(null);
 
     if (!values.identificador.trim() || !values.senha.trim()) {
-      setError("Preencha CPF e senha para continuar.");
+      setError("Preencha e-mail ou CPF e senha para continuar.");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      const rawIdentifier = values.identificador.trim();
+      const isEmailIdentifier = rawIdentifier.includes("@");
+      const normalizedIdentifier = isEmailIdentifier
+        ? rawIdentifier.toLowerCase()
+        : rawIdentifier.replace(/\D/g, "");
+
+      if (!normalizedIdentifier) {
+        setError("Informe um e-mail ou CPF válido.");
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload = {
-        identificador: values.identificador.replace(/\D/g, ""),
+        identificador: normalizedIdentifier,
         senha: values.senha,
       };
 
@@ -76,6 +88,10 @@ export const LoginForm = ({
           typeof responseData.token_type === "string"
             ? responseData.token_type
             : "bearer",
+        foto_perfil_url:
+          typeof responseData.foto_perfil_url === "string"
+            ? responseData.foto_perfil_url
+            : null,
       };
 
       onLoginSuccess(session);
@@ -134,12 +150,14 @@ export const LoginForm = ({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="space-y-2 block">
-            <span className="text-sm font-medium text-slate-700">CPF *</span>
+            <span className="text-sm font-medium text-slate-700">
+              E-mail ou CPF *
+            </span>
             <Input
               name="identificador"
               value={values.identificador}
               onChange={handleChange}
-              placeholder="Digite seu CPF"
+              placeholder="Digite seu e-mail ou CPF"
             />
           </label>
 

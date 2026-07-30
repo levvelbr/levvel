@@ -307,7 +307,7 @@ export const ClientForm = ({
                   name="genero"
                   value={values.genero}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm border-none focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 >
                   <option value="">Selecione</option>
                   <option value="masculino">Masculino</option>
@@ -328,7 +328,7 @@ export const ClientForm = ({
                   name="forma_pagamento_preferida"
                   value={values.forma_pagamento_preferida}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm border-none focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 >
                   <option value="dinheiro">Dinheiro</option>
                   <option value="pix">Pix</option>

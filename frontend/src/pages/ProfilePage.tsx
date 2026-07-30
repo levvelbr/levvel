@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { AuthModal } from "../components/AuthModal";
 import { Header } from "../components/Header";
+import { Sidebar } from "../components/Sidebar";
 import api from "../services/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -107,11 +108,18 @@ const sectionClass = "rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-6";
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const ProfilePage = () => {
-  const { session, logout } = useAuth();
+  const { session, logout, updateSession } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"profile" | "bookings">("profile");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"profile" | "bookings">(() =>
+    searchParams.get("tab") === "bookings" ? "bookings" : "profile",
+  );
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
+  const [photoUploadLoading, setPhotoUploadLoading] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
 
   // ── Client state ────────────────────────────────────────────────────────────
   const [clientProfile, setClientProfile] = useState<ClienteProfile | null>(
@@ -156,6 +164,11 @@ export const ProfilePage = () => {
           setFormaPagamento(p.forma_pagamento_preferida ?? "");
           setLocalizacao(p.localizacao_inicial ?? "");
           setEmail(p.email ?? "");
+          const preferredName = p.nome_tratamento?.trim() || p.nome_usuario;
+          updateSession({
+            nome: preferredName,
+            foto_perfil_url: p.foto_perfil_url ?? null,
+          });
         })
         .catch(() => {})
         .finally(() => setClientLoading(false));
@@ -165,11 +178,23 @@ export const ProfilePage = () => {
       setEstabLoading(true);
       api
         .get("/v1/estabelecimentos/me")
-        .then((r) => setEstabProfile(r.data as EstabelecimentoProfile))
+        .then((r) => {
+          const p = r.data as EstabelecimentoProfile;
+          setEstabProfile(p);
+          updateSession({
+            nome: p.nome_estabelecimento,
+            foto_perfil_url: p.foto_estabelecimento_url ?? null,
+          });
+        })
         .catch(() => {})
         .finally(() => setEstabLoading(false));
     }
-  }, [session]);
+  }, [session?.id, session?.role, updateSession]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab") === "bookings" ? "bookings" : "profile";
+    setActiveTab(tab);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!session || activeTab !== "bookings") return;
@@ -185,7 +210,7 @@ export const ProfilePage = () => {
       .then((r) => setAgendamentos(r.data as Agendamento[]))
       .catch(() => setAgendamentos([]))
       .finally(() => setAgendamentosLoading(false));
-  }, [session, activeTab]);
+  }, [session?.id, session?.role, activeTab]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -206,7 +231,12 @@ export const ProfilePage = () => {
 
     try {
       const r = await api.patch("/v1/clientes/me/update", body);
-      setClientProfile(r.data as ClienteProfile);
+      const updatedProfile = r.data as ClienteProfile;
+      setClientProfile(updatedProfile);
+      updateSession({
+        nome:
+          updatedProfile.nome_tratamento?.trim() || updatedProfile.nome_usuario,
+      });
       setEditSuccess(true);
       setIsEditing(false);
       setNovaSenha("");
@@ -225,7 +255,19 @@ export const ProfilePage = () => {
   ) => {
     setStatusUpdating(id);
     try {
-      await api.patch(`/v1/agendamentos/${id}/status`, { status });
+      const payload: {
+        status: Agendamento["status"];
+        motivo_recusa?: string | null;
+      } = {
+        status,
+      };
+
+      if (status === "recusado") {
+        payload.motivo_recusa = "Recusado pelo estabelecimento.";
+      }
+
+      await api.patch(`/v1/agendamentos/${id}/status`, payload);
+
       setAgendamentos((prev) =>
         prev.map((a) => (a.id === id ? { ...a, status } : a)),
       );
@@ -236,6 +278,99 @@ export const ProfilePage = () => {
     }
   };
 
+  const handleFinalizeBooking = async (id: string) => {
+    setStatusUpdating(id);
+
+    try {
+      await api.post(
+        `/v1/agendamentos/${id}/encerrar`,
+        {},
+        {
+          params: {
+            custo_final: 0,
+          },
+        },
+      );
+
+      setAgendamentos((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: "concluido" } : a)),
+      );
+    } catch {
+      // ignore
+    } finally {
+      setStatusUpdating(null);
+    }
+  };
+
+  const handleChangeTab = (tab: "profile" | "bookings") => {
+    setActiveTab(tab);
+
+    if (tab === "bookings") {
+      setSearchParams({ tab: "bookings" }, { replace: true });
+      return;
+    }
+
+    setSearchParams({}, { replace: true });
+  };
+
+  const handlePhotoUpload = async () => {
+    if (!session || !selectedPhotoFile) {
+      return;
+    }
+
+    setPhotoUploadError(null);
+    setPhotoUploadLoading(true);
+
+    const formData = new FormData();
+    formData.append("file", selectedPhotoFile);
+
+    try {
+      if (session.role === "cliente") {
+        const response = await api.post(
+          "/v1/clientes/me/foto-perfil",
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          },
+        );
+
+        const updatedProfile = response.data as ClienteProfile;
+        setClientProfile(updatedProfile);
+        updateSession({
+          foto_perfil_url: updatedProfile.foto_perfil_url ?? null,
+        });
+      } else {
+        const response = await api.post(
+          "/v1/estabelecimentos/me/foto-perfil",
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          },
+        );
+
+        const updatedProfile = response.data as EstabelecimentoProfile;
+        setEstabProfile(updatedProfile);
+        updateSession({
+          foto_perfil_url: updatedProfile.foto_estabelecimento_url ?? null,
+        });
+      }
+
+      setSelectedPhotoFile(null);
+    } catch (err: unknown) {
+      setPhotoUploadError(
+        err instanceof Error
+          ? err.message
+          : "Nao foi possível enviar a foto de perfil.",
+      );
+    } finally {
+      setPhotoUploadLoading(false);
+    }
+  };
+
   if (!session) return null;
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -243,8 +378,9 @@ export const ProfilePage = () => {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <Header
-        onOpenMenu={() => {}}
+        onOpenMenu={() => setIsSidebarOpen(true)}
         loggedClientName={session.nome}
+        loggedClientPhotoUrl={session.foto_perfil_url ?? null}
         onOpenLogin={() => setIsAuthModalOpen(true)}
         onLogout={() => {
           logout();
@@ -258,32 +394,61 @@ export const ProfilePage = () => {
         onAuthChange={() => setIsAuthModalOpen(false)}
       />
 
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onOpenLogin={() => setIsAuthModalOpen(true)}
+      />
+
       <main className="flex-1 px-4 py-8 sm:px-6">
         <div className="mx-auto max-w-4xl space-y-6">
           {/* Tabs */}
-          <div className="flex w-fit gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
-            <button
-              type="button"
-              onClick={() => setActiveTab("profile")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === "profile"
-                  ? "bg-emerald-700 text-white"
-                  : "text-slate-600 hover:bg-slate-100"
-              }`}
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              to="/"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+              aria-label="Voltar para a home"
             >
-              Meu perfil
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("bookings")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === "bookings"
-                  ? "bg-emerald-700 text-white"
-                  : "text-slate-600 hover:bg-slate-100"
-              }`}
-            >
-              {session.role === "cliente" ? "Meus agendamentos" : "Agenda"}
-            </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.8}
+                stroke="currentColor"
+                className="h-5 w-5"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75V19.5A2.25 2.25 0 0 0 6.75 21.75h3.75v-6a.75.75 0 0 1 .75-.75h2.25a.75.75 0 0 1 .75.75v6h3.75a2.25 2.25 0 0 0 2.25-2.25V9.75"
+                />
+              </svg>
+            </Link>
+
+            <div className="flex w-fit gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+              <button
+                type="button"
+                onClick={() => handleChangeTab("profile")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                  activeTab === "profile"
+                    ? "bg-emerald-700 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Meu perfil
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChangeTab("bookings")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                  activeTab === "bookings"
+                    ? "bg-emerald-700 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {session.role === "cliente" ? "Meus agendamentos" : "Agenda"}
+              </button>
+            </div>
           </div>
 
           {/* ── Profile tab ── */}
@@ -292,15 +457,28 @@ export const ProfilePage = () => {
               {/* Profile info */}
               <div className={sectionClass}>
                 <div className="mb-4 flex items-start justify-between">
-                  <div>
-                    <h1 className="text-xl font-semibold text-slate-900">
-                      {clientLoading
-                        ? "Carregando..."
-                        : clientProfile?.nome_usuario}
-                    </h1>
-                    <p className="text-sm text-slate-500">
-                      {clientProfile?.email ?? session.email_ou_cpf}
-                    </p>
+                  <div className="flex items-start gap-4">
+                    {clientProfile?.foto_perfil_url ? (
+                      <img
+                        src={clientProfile.foto_perfil_url}
+                        alt="Foto de perfil"
+                        className="h-16 w-16 rounded-2xl object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-lg font-semibold text-slate-500">
+                        {session.nome.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <h1 className="text-xl font-semibold text-slate-900">
+                        {clientLoading
+                          ? "Carregando..."
+                          : clientProfile?.nome_usuario}
+                      </h1>
+                      <p className="text-sm text-slate-500">
+                        {clientProfile?.email ?? session.email_ou_cpf}
+                      </p>
+                    </div>
                   </div>
                   {!isEditing && (
                     <button
@@ -315,6 +493,40 @@ export const ProfilePage = () => {
                       Editar
                     </button>
                   )}
+                </div>
+
+                <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Foto de perfil
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Envie uma imagem para aparecer no seu perfil e no cabeçalho.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        setSelectedPhotoFile(file);
+                        setPhotoUploadError(null);
+                      }}
+                      className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800"
+                    />
+                    <button
+                      type="button"
+                      disabled={!selectedPhotoFile || photoUploadLoading}
+                      onClick={handlePhotoUpload}
+                      className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                    >
+                      {photoUploadLoading ? "Enviando..." : "Salvar foto"}
+                    </button>
+                  </div>
+                  {photoUploadError ? (
+                    <p className="mt-2 text-sm text-rose-700">
+                      {photoUploadError}
+                    </p>
+                  ) : null}
                 </div>
 
                 {clientProfile && !isEditing && (
@@ -533,6 +745,40 @@ export const ProfilePage = () => {
                     </div>
                   </div>
 
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Foto de perfil
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Envie uma imagem para representar seu perfil de prestador.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          setSelectedPhotoFile(file);
+                          setPhotoUploadError(null);
+                        }}
+                        className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800"
+                      />
+                      <button
+                        type="button"
+                        disabled={!selectedPhotoFile || photoUploadLoading}
+                        onClick={handlePhotoUpload}
+                        className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                      >
+                        {photoUploadLoading ? "Enviando..." : "Salvar foto"}
+                      </button>
+                    </div>
+                    {photoUploadError ? (
+                      <p className="mt-2 text-sm text-rose-700">
+                        {photoUploadError}
+                      </p>
+                    ) : null}
+                  </div>
+
                   <dl className="grid gap-3 text-sm sm:grid-cols-2">
                     <div>
                       <dt className="font-semibold text-slate-900">
@@ -710,9 +956,16 @@ export const ProfilePage = () => {
                           </>
                         )}
                         {ag.status === "em_andamento" && (
-                          <span className="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700">
-                            Atendimento em andamento
-                          </span>
+                          <button
+                            type="button"
+                            disabled={statusUpdating === ag.id}
+                            onClick={() => handleFinalizeBooking(ag.id)}
+                            className="rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800 disabled:opacity-60"
+                          >
+                            {statusUpdating === ag.id
+                              ? "Finalizando..."
+                              : "Finalizar atendimento"}
+                          </button>
                         )}
                       </div>
                     )}

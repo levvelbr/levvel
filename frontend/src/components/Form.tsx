@@ -237,9 +237,15 @@ export const Form = () => {
       className="rounded-3xl bg-white/95 p-8 shadow-md ring-1 ring-slate-200"
     >
       <div className="mb-6 flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-semibold text-emerald-900">
-          Cadastro de estabelecimento
-        </h2>
+        <div>
+          <h2 className="text-2xl font-semibold text-emerald-900">
+            Cadastro de estabelecimento
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Preencha os dados para publicar seu negócio na plataforma.
+          </p>
+        </div>
+
         <div className="flex items-center gap-2">
           {[1, 2, 3].map((step) => {
             const isActive = currentStep === step;

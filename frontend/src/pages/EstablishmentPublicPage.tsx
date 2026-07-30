@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { AuthModal } from "../components/AuthModal";
 import { Header } from "../components/Header";
+import { Sidebar } from "../components/Sidebar";
 import { BookingForm } from "../components/BookingForm";
 import api from "../services/api";
 
@@ -47,6 +48,7 @@ export const EstablishmentPublicPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
 
   useEffect(() => {
@@ -122,10 +124,19 @@ export const EstablishmentPublicPage = () => {
     return (
       <div className="flex min-h-screen flex-col bg-slate-50">
         <Header
-          onOpenMenu={() => {}}
+          onOpenMenu={() => setIsSidebarOpen(true)}
           loggedClientName={session?.nome ?? null}
+          loggedClientPhotoUrl={session?.foto_perfil_url ?? null}
           onOpenLogin={() => setIsAuthModalOpen(true)}
-          onLogout={logout}
+          onLogout={() => {
+            logout();
+            navigate("/");
+          }}
+        />
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          onOpenLogin={() => setIsAuthModalOpen(true)}
         />
         <main className="flex-1 px-4 py-8 sm:px-6">
           <div className="mx-auto max-w-5xl rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
@@ -142,10 +153,19 @@ export const EstablishmentPublicPage = () => {
     return (
       <div className="flex min-h-screen flex-col bg-slate-50">
         <Header
-          onOpenMenu={() => {}}
+          onOpenMenu={() => setIsSidebarOpen(true)}
           loggedClientName={session?.nome ?? null}
+          loggedClientPhotoUrl={session?.foto_perfil_url ?? null}
           onOpenLogin={() => setIsAuthModalOpen(true)}
-          onLogout={logout}
+          onLogout={() => {
+            logout();
+            navigate("/");
+          }}
+        />
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          onOpenLogin={() => setIsAuthModalOpen(true)}
         />
         <main className="flex-1 px-4 py-8 sm:px-6">
           <div className="mx-auto max-w-5xl rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
@@ -167,10 +187,20 @@ export const EstablishmentPublicPage = () => {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <Header
-        onOpenMenu={() => {}}
+        onOpenMenu={() => setIsSidebarOpen(true)}
         loggedClientName={session?.nome ?? null}
+        loggedClientPhotoUrl={session?.foto_perfil_url ?? null}
         onOpenLogin={() => setIsAuthModalOpen(true)}
-        onLogout={logout}
+        onLogout={() => {
+          logout();
+          navigate("/");
+        }}
+      />
+
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onOpenLogin={() => setIsAuthModalOpen(true)}
       />
 
       <AuthModal

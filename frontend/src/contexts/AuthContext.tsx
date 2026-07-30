@@ -18,6 +18,7 @@ interface AuthContextValue {
   session: UserSession | null;
   isAuthenticated: boolean;
   login: (nextSession: UserSession) => void;
+  updateSession: (nextSession: Partial<UserSession>) => void;
   logout: () => void;
 }
 
@@ -52,6 +53,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setSession(nextSession);
     };
 
+    const updateSession = (nextSession: Partial<UserSession>) => {
+      setSession((currentSession) => {
+        if (!currentSession) {
+          return currentSession;
+        }
+
+        const hasAnyChange = Object.entries(nextSession).some(
+          ([key, value]) => currentSession[key as keyof UserSession] !== value,
+        );
+
+        if (!hasAnyChange) {
+          return currentSession;
+        }
+
+        const mergedSession = {
+          ...currentSession,
+          ...nextSession,
+        };
+
+        setStoredSession(mergedSession);
+        return mergedSession;
+      });
+    };
+
     const logout = () => {
       clearStoredSession();
       setSession(null);
@@ -61,6 +86,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       session,
       isAuthenticated: Boolean(session?.access_token),
       login,
+      updateSession,
       logout,
     };
   }, [session]);

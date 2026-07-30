@@ -43,6 +43,10 @@ export const getStoredSession = (): UserSession | null => {
       access_token: parsed.access_token,
       token_type:
         typeof parsed.token_type === "string" ? parsed.token_type : "bearer",
+      foto_perfil_url:
+        typeof parsed.foto_perfil_url === "string"
+          ? parsed.foto_perfil_url
+          : null,
     };
   } catch {
     return null;

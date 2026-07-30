@@ -7,4 +7,5 @@ export interface UserSession {
   email_ou_cpf: string;
   access_token: string;
   token_type?: string;
+  foto_perfil_url?: string | null;
 }

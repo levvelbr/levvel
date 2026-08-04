@@ -9,6 +9,7 @@ class UserRole(str, Enum):
 class LoginSchema(BaseModel):
     identificador: str = Field(..., description="Email ou CPF do usuário")
     senha: str = Field(..., description="Senha do usuário")
+    role: UserRole = Field(..., description="Papel do usuário (cliente ou estabelecimento)")
     
 class UserSessionResponse(BaseModel):
     id: str

@@ -34,8 +34,9 @@ class ClienteBase(BaseModel):
 
 # Schema para quando o desenvolvedor do Front-end for criar um novo cliente (POST)
 class ClienteCreate(ClienteBase):
-    senha: str = Field(..., min_length=6, description="Senha para login do cliente")
     email: EmailStr = Field(..., description="Email do cliente para login e comunicação")
+    senha: str = Field(..., min_length=6, description="Senha para login do cliente")
+    termos_aceitos: bool = Field(..., description="Confirmação de que o usuário aceitou os termos de uso e política de privacidade")
     
 class ClienteUpdate(BaseModel):
     nome_tratamento: Optional[str] = Field(None, description="Como o cliente prefere ser chamado")

@@ -38,6 +38,7 @@ class EstabelecimentoBase(BaseModel):
 
 class EstabelecimentoCreate(EstabelecimentoBase):
     senha_hash: str = Field(..., min_length=6, description="Senha para login do estabelecimento")
+    termos_aceitos: bool = Field(..., description="Confirmação de que o usuário aceitou os termos de uso e política de privacidade")
     pass
 
 class EstabelecimentoUpdate(BaseModel):

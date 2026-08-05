@@ -9,7 +9,6 @@ interface FormValues {
   telefone: string;
   email: string;
   localizacao: string;
-  foto_estabelecimento_url: string;
   cnpj: string;
   razao_social: string;
   categoria: string;
@@ -38,7 +37,6 @@ const initialFormValues: FormValues = {
   telefone: "",
   email: "",
   localizacao: "",
-  foto_estabelecimento_url: "",
   cnpj: "",
   razao_social: "",
   categoria: "Geral",
@@ -68,6 +66,8 @@ const parseCsv = (value: string) =>
 
 export const Form = () => {
   const [values, setValues] = useState<FormValues>(initialFormValues);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoInputKey, setPhotoInputKey] = useState(0);
   const [errors, setErrors] = useState<Partial<FormValues>>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -92,6 +92,13 @@ export const Form = () => {
       delete nextErrors[name as keyof FormValues];
       return nextErrors;
     });
+    setServerError(null);
+    setSuccessMessage(null);
+  };
+
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setPhotoFile(file);
     setServerError(null);
     setSuccessMessage(null);
   };
@@ -200,11 +207,11 @@ export const Form = () => {
       telefone: values.telefone.trim(),
       email: values.email.trim(),
       localizacao: values.localizacao.trim(),
-      foto_estabelecimento_url: values.foto_estabelecimento_url.trim() || null,
-      cnpj: values.cnpj.trim(),
-      razao_social: values.razao_social.trim(),
+      foto_estabelecimento_url: null,
+      cnpj: values.cnpj.trim() || null,
+      razao_social: values.razao_social.trim() || null,
       categoria: values.categoria,
-      instagram: values.instagram.trim(),
+      instagram: values.instagram.trim() || null,
       servicos_oferecidos: parseCsv(values.servicos_oferecidos),
       tecnicas_utilizadas: parseCsv(values.tecnicas_utilizadas),
       produtos_aplicados: parseCsv(values.produtos_aplicados),
@@ -221,6 +228,8 @@ export const Form = () => {
       await api.post("/v1/estabelecimentos/", body);
       setSuccessMessage("Estabelecimento cadastrado com sucesso.");
       setValues(initialFormValues);
+      setPhotoFile(null);
+      setPhotoInputKey((prev) => prev + 1);
       setCurrentStep(1);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -324,14 +333,24 @@ export const Form = () => {
 
             <label className="space-y-2 md:col-span-2">
               <span className="text-sm font-medium text-slate-700">
-                URL da foto do estabelecimento (opcional)
+                Foto do estabelecimento (opcional)
               </span>
-              <Input
-                name="foto_estabelecimento_url"
-                value={values.foto_estabelecimento_url}
-                onChange={handleChange}
-                placeholder="https://exemplo.com/foto.jpg"
+              <input
+                key={photoInputKey}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300"
               />
+              {photoFile ? (
+                <span className="text-xs text-slate-500">
+                  Arquivo selecionado: {photoFile.name}
+                </span>
+              ) : null}
+              <span className="text-xs text-amber-700">
+                A foto sera enviada no perfil do estabelecimento apos o primeiro
+                login.
+              </span>
             </label>
 
             <label className="space-y-2">

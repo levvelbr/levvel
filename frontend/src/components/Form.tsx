@@ -20,7 +20,10 @@ interface FormValues {
   horario_funcionamento: string;
   senha_hash: string;
   confirmar_senha: string;
+  aceitou_termos: boolean;
 }
+
+type FormErrors = Partial<Record<keyof FormValues, string>>;
 
 const categoryOptions = [
   "Geral",
@@ -48,6 +51,7 @@ const initialFormValues: FormValues = {
   horario_funcionamento: "",
   senha_hash: "",
   confirmar_senha: "",
+  aceitou_termos: false,
 };
 
 const validateEmail = (value: string) =>
@@ -68,7 +72,7 @@ export const Form = () => {
   const [values, setValues] = useState<FormValues>(initialFormValues);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoInputKey, setPhotoInputKey] = useState(0);
-  const [errors, setErrors] = useState<Partial<FormValues>>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,8 +107,20 @@ export const Form = () => {
     setSuccessMessage(null);
   };
 
+  const handleTermsChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const checked = event.target.checked;
+    setValues((prev) => ({ ...prev, aceitou_termos: checked }));
+    setErrors((prev) => {
+      const nextErrors = { ...prev };
+      delete nextErrors.aceitou_termos;
+      return nextErrors;
+    });
+    setServerError(null);
+    setSuccessMessage(null);
+  };
+
   const validateStep = (stepNumber: number, formValues: FormValues) => {
-    const newErrors: Partial<FormValues> = {};
+    const newErrors: FormErrors = {};
 
     if (stepNumber === 1) {
       if (!formValues.nome_estabelecimento.trim()) {
@@ -168,6 +184,9 @@ export const Form = () => {
       } else if (formValues.senha_hash !== formValues.confirmar_senha) {
         newErrors.confirmar_senha = "As senhas não conferem";
       }
+      if (!formValues.aceitou_termos) {
+        newErrors.aceitou_termos = "Voce precisa aceitar os termos para continuar";
+      }
     }
 
     return newErrors;
@@ -218,6 +237,7 @@ export const Form = () => {
       profissionais_envolvidos: parseCsv(values.profissionais_envolvidos),
       horario_funcionamento: JSON.parse(values.horario_funcionamento),
       senha_hash: values.senha_hash,
+      aceitou_termos: values.aceitou_termos,
     };
 
     setIsSubmitting(true);
@@ -590,6 +610,35 @@ export const Form = () => {
                 </span>
               )}
             </label>
+
+            <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <label className="flex items-start gap-3 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  name="aceitou_termos"
+                  checked={values.aceitou_termos}
+                  onChange={handleTermsChange}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
+                />
+                <span>
+                  Li e aceito os{" "}
+                  <a
+                    href="/termos-e-privacidade"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-emerald-700 underline"
+                  >
+                    Termos de Uso e Politicas de Privacidade
+                  </a>
+                  .
+                </span>
+              </label>
+              {errors.aceitou_termos ? (
+                <span className="mt-2 block text-sm text-red-500">
+                  {errors.aceitou_termos}
+                </span>
+              ) : null}
+            </div>
           </>
         ) : null}
       </div>
@@ -609,7 +658,10 @@ export const Form = () => {
               Próximo
             </Button>
           ) : (
-            <Button type="submit" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !values.aceitou_termos}
+            >
               {isSubmitting ? "Enviando..." : "Cadastrar estabelecimento"}
             </Button>
           )}

@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
@@ -15,7 +15,10 @@ interface ClientFormValues {
   localizacao_inicial: string;
   senha: string;
   confirmar_senha: string;
+  aceitou_termos: boolean;
 }
+
+type ClientFormErrors = Partial<Record<keyof ClientFormValues, string>>;
 
 interface ClientFormProps {
   onClose: () => void;
@@ -34,6 +37,7 @@ const initialFormValues: ClientFormValues = {
   localizacao_inicial: "",
   senha: "",
   confirmar_senha: "",
+  aceitou_termos: false,
 };
 
 const validateCpf = (value: string) => {
@@ -58,7 +62,9 @@ const extractErrorMessage = (error: unknown) => {
         : String(error);
 };
 
-const parseUserSession = (data: Partial<UserSession> | undefined): UserSession => {
+const parseUserSession = (
+  data: Partial<UserSession> | undefined,
+): UserSession => {
   if (
     !data ||
     typeof data.id !== "string" ||
@@ -76,7 +82,8 @@ const parseUserSession = (data: Partial<UserSession> | undefined): UserSession =
     nome: data.nome,
     email_ou_cpf: data.email_ou_cpf,
     access_token: data.access_token,
-    token_type: typeof data.token_type === "string" ? data.token_type : "bearer",
+    token_type:
+      typeof data.token_type === "string" ? data.token_type : "bearer",
     foto_perfil_url:
       typeof data.foto_perfil_url === "string" ? data.foto_perfil_url : null,
   };
@@ -88,28 +95,51 @@ export const ClientForm = ({
   onBackToLogin,
 }: ClientFormProps) => {
   const [values, setValues] = useState<ClientFormValues>(initialFormValues);
-  const [errors, setErrors] = useState<Partial<ClientFormValues>>({});
+  const [errors, setErrors] = useState<ClientFormErrors>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [showTermsAlert, setShowTermsAlert] = useState(false);
+  const [hasAttemptedSubmitStep2, setHasAttemptedSubmitStep2] =
+    useState(false);
+
+  useEffect(() => {
+    if (currentStep === 2) {
+      setHasAttemptedSubmitStep2(false);
+      setShowTermsAlert(false);
+      setErrors({});
+    }
+  }, [currentStep]);
 
   const handleChange = (
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    const { name, value } = event.target;
-    setValues((prev) => ({ ...prev, [name]: value }));
+    const { name } = event.target;
+    const nextValue =
+      event.target instanceof HTMLInputElement && event.target.type === "checkbox"
+        ? event.target.checked
+        : event.target.value;
+
+    setValues((prev) => ({ ...prev, [name]: nextValue }));
     setErrors((prev) => {
       const nextErrors = { ...prev };
       delete nextErrors[name as keyof ClientFormValues];
       return nextErrors;
     });
+    if (name === "aceitou_termos") {
+      const isChecked =
+        event.target instanceof HTMLInputElement ? event.target.checked : false;
+      if (isChecked) {
+        setShowTermsAlert(false);
+      }
+    }
     setServerError(null);
     setSuccessMessage(null);
   };
 
   const validateStep = (stepNumber: number, formValues: ClientFormValues) => {
-    const nextErrors: Partial<ClientFormValues> = {};
+    const nextErrors: ClientFormErrors = {};
 
     if (stepNumber === 1) {
       if (!formValues.nome_usuario.trim()) {
@@ -149,6 +179,9 @@ export const ClientForm = ({
       } else if (formValues.senha !== formValues.confirmar_senha) {
         nextErrors.confirmar_senha = "As senhas não conferem";
       }
+      if (!formValues.aceitou_termos) {
+        nextErrors.aceitou_termos = "Voce precisa aceitar os termos para continuar";
+      }
     }
 
     return nextErrors;
@@ -159,7 +192,15 @@ export const ClientForm = ({
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
+      if (currentStep === 2 && !values.aceitou_termos) {
+        setShowTermsAlert(true);
+      }
       return;
+    }
+
+    setShowTermsAlert(false);
+    if (currentStep === 1) {
+      setHasAttemptedSubmitStep2(false);
     }
 
     setErrors({});
@@ -168,20 +209,40 @@ export const ClientForm = ({
 
   const handleBack = () => {
     setErrors({});
+    setShowTermsAlert(false);
+    setHasAttemptedSubmitStep2(false);
     setCurrentStep((prev) => prev - 1);
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const nativeSubmitEvent = event.nativeEvent as SubmitEvent;
+    const submitter = nativeSubmitEvent.submitter as
+      | HTMLButtonElement
+      | null;
+    const isFinalSubmit =
+      submitter?.getAttribute("data-submit-intent") === "register-client";
+
+    if (!isFinalSubmit) {
+      return;
+    }
+
+    setHasAttemptedSubmitStep2(true);
+
     const nextErrors = validateStep(currentStep, values);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
+      if (!values.aceitou_termos) {
+        setShowTermsAlert(true);
+      }
       return;
     }
 
-    const body: Record<string, string> = {
+    setShowTermsAlert(false);
+
+    const body: Record<string, string | boolean> = {
       nome_usuario: values.nome_usuario.trim(),
       email: values.email.trim(),
       cpf: values.cpf.replace(/\D/g, ""),
@@ -190,6 +251,7 @@ export const ClientForm = ({
       forma_pagamento_preferida: values.forma_pagamento_preferida,
       localizacao_inicial: values.localizacao_inicial.trim(),
       senha: values.senha,
+      aceitou_termos: values.aceitou_termos,
     };
 
     const trimmedTreatment = values.nome_tratamento.trim();
@@ -430,7 +492,7 @@ export const ClientForm = ({
                   onChange={handleChange}
                   placeholder="Digite sua senha"
                 />
-                {errors.senha ? (
+                {hasAttemptedSubmitStep2 && errors.senha ? (
                   <span className="text-sm text-red-500">{errors.senha}</span>
                 ) : null}
               </label>
@@ -446,12 +508,47 @@ export const ClientForm = ({
                   onChange={handleChange}
                   placeholder="Repita a senha"
                 />
-                {errors.confirmar_senha ? (
+                {hasAttemptedSubmitStep2 && errors.confirmar_senha ? (
                   <span className="text-sm text-red-500">
                     {errors.confirmar_senha}
                   </span>
                 ) : null}
               </label>
+
+              <div
+                className={`md:col-span-2 rounded-2xl border bg-slate-50 px-4 py-3 transition-colors ${
+                  showTermsAlert
+                    ? "border-amber-300 bg-amber-50"
+                    : "border-slate-200"
+                }`}
+              >
+                <label className="flex items-start gap-3 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    name="aceitou_termos"
+                    checked={values.aceitou_termos}
+                    onChange={handleChange}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
+                  />
+                  <span>
+                    Li e aceito os{" "}
+                    <a
+                      href="/termos-e-privacidade"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-semibold text-emerald-700 underline"
+                    >
+                      Termos de Uso e Politicas de Privacidade
+                    </a>
+                    .
+                  </span>
+                </label>
+                {showTermsAlert && hasAttemptedSubmitStep2 ? (
+                  <p className="mt-2 text-sm text-amber-800">
+                    Para continuar, confirme o aceite dos termos.
+                  </p>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
@@ -469,7 +566,11 @@ export const ClientForm = ({
                 Próximo
               </Button>
             ) : (
-              <Button type="submit" disabled={isSubmitting}>
+              <Button
+                type="submit"
+                data-submit-intent="register-client"
+                disabled={isSubmitting}
+              >
                 {isSubmitting ? "Cadastrando..." : "Cadastrar cliente"}
               </Button>
             )}

@@ -3,6 +3,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { EstablishmentPublicPage } from "./pages/EstablishmentPublicPage";
 import { HomePage } from "./pages/HomePage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { TermsPrivacyPage } from "./pages/TermsPrivacyPage";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 
@@ -17,6 +18,7 @@ export const App = () => {
             path="/estabelecimentos/:id"
             element={<EstablishmentPublicPage />}
           />
+          <Route path="/termos-e-privacidade" element={<TermsPrivacyPage />} />
           <Route path="/nao-autorizado" element={<UnauthorizedPage />} />
 
           <Route element={<ProtectedRoute />}>

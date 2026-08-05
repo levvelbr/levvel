@@ -5,6 +5,7 @@ import api from "../services/api";
 
 interface ClientFormValues {
   nome_usuario: string;
+  email: string;
   nome_tratamento: string;
   cpf: string;
   data_nascimento: string;
@@ -23,6 +24,7 @@ interface ClientFormProps {
 
 const initialFormValues: ClientFormValues = {
   nome_usuario: "",
+  email: "",
   nome_tratamento: "",
   cpf: "",
   data_nascimento: "",
@@ -37,6 +39,8 @@ const validateCpf = (value: string) => {
   const digits = value.replace(/\D/g, "");
   return digits.length === 11;
 };
+
+const validateEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
 
 export const ClientForm = ({
   onClose,
@@ -70,6 +74,11 @@ export const ClientForm = ({
     if (stepNumber === 1) {
       if (!formValues.nome_usuario.trim()) {
         nextErrors.nome_usuario = "Nome de usuário é obrigatório";
+      }
+      if (!formValues.email.trim()) {
+        nextErrors.email = "E-mail é obrigatório";
+      } else if (!validateEmail(formValues.email.trim())) {
+        nextErrors.email = "Informe um e-mail válido";
       }
       if (!formValues.cpf.trim()) {
         nextErrors.cpf = "CPF é obrigatório";
@@ -134,6 +143,7 @@ export const ClientForm = ({
 
     const body: Record<string, string> = {
       nome_usuario: values.nome_usuario.trim(),
+      email: values.email.trim(),
       cpf: values.cpf.replace(/\D/g, ""),
       data_nascimento: values.data_nascimento,
       genero: values.genero,
@@ -255,6 +265,22 @@ export const ClientForm = ({
                 ) : null}
               </label>
 
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">
+                  E-mail *
+                </span>
+                <Input
+                  type="email"
+                  name="email"
+                  value={values.email}
+                  onChange={handleChange}
+                  placeholder="voce@exemplo.com"
+                />
+                {errors.email ? (
+                  <span className="text-sm text-red-500">{errors.email}</span>
+                ) : null}
+              </label>
+
               <label className="space-y-2">
                 <span className="text-sm font-medium text-slate-700">
                   Nome de tratamento
@@ -332,7 +358,8 @@ export const ClientForm = ({
                 >
                   <option value="dinheiro">Dinheiro</option>
                   <option value="pix">Pix</option>
-                  <option value="cartao">Cartão</option>
+                  <option value="cartao_debito">Cartão de débito</option>
+                  <option value="cartao_credito">Cartão de crédito</option>
                 </select>
                 {errors.forma_pagamento_preferida ? (
                   <span className="text-sm text-red-500">

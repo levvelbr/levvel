@@ -53,7 +53,8 @@ export const AuthModal = ({
             setIsClientFormOpen(false);
             onClose();
           }}
-          onLoginSuccess={() => {
+          onLoginSuccess={(session) => {
+            onAuthChange?.(session);
             setIsClientFormOpen(false);
             onClose();
           }}

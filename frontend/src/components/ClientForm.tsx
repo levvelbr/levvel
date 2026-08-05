@@ -2,6 +2,7 @@ import { useState, type ChangeEvent, type FormEvent } from "react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
+import type { UserSession } from "../types/auth";
 
 interface ClientFormValues {
   nome_usuario: string;
@@ -18,7 +19,7 @@ interface ClientFormValues {
 
 interface ClientFormProps {
   onClose: () => void;
-  onLoginSuccess: (userName: string) => void;
+  onLoginSuccess: (session: UserSession) => void;
   onBackToLogin?: () => void;
 }
 
@@ -41,6 +42,45 @@ const validateCpf = (value: string) => {
 };
 
 const validateEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
+
+const extractErrorMessage = (error: unknown) => {
+  const responseData =
+    typeof error === "object" && error !== null && "response" in error
+      ? (error as { response?: { data?: unknown } }).response?.data
+      : undefined;
+
+  return typeof responseData === "string"
+    ? responseData
+    : responseData
+      ? JSON.stringify(responseData)
+      : error instanceof Error
+        ? error.message
+        : String(error);
+};
+
+const parseUserSession = (data: Partial<UserSession> | undefined): UserSession => {
+  if (
+    !data ||
+    typeof data.id !== "string" ||
+    typeof data.role !== "string" ||
+    typeof data.nome !== "string" ||
+    typeof data.email_ou_cpf !== "string" ||
+    typeof data.access_token !== "string"
+  ) {
+    throw new Error("Resposta de autenticacao invalida.");
+  }
+
+  return {
+    id: data.id,
+    role: data.role,
+    nome: data.nome,
+    email_ou_cpf: data.email_ou_cpf,
+    access_token: data.access_token,
+    token_type: typeof data.token_type === "string" ? data.token_type : "bearer",
+    foto_perfil_url:
+      typeof data.foto_perfil_url === "string" ? data.foto_perfil_url : null,
+  };
+};
 
 export const ClientForm = ({
   onClose,
@@ -160,43 +200,33 @@ export const ClientForm = ({
     setIsSubmitting(true);
     setServerError(null);
     setSuccessMessage(null);
+    let clientCreated = false;
 
     try {
       await api.post("/v1/clientes", body);
-      const userDisplayName =
-        values.nome_tratamento.trim() || values.nome_usuario.trim();
+      clientCreated = true;
 
-      const persistedClients = window.localStorage.getItem("registeredClients");
-      const clients = persistedClients ? JSON.parse(persistedClients) : [];
-      clients.push({
-        ...body,
-        nome_tratamento: values.nome_tratamento.trim(),
+      const loginResponse = await api.post("/v1/auth/login", {
+        identificador: values.email.trim().toLowerCase(),
+        senha: values.senha,
       });
-      window.localStorage.setItem("registeredClients", JSON.stringify(clients));
-      window.localStorage.setItem(
-        "loggedClient",
-        JSON.stringify({ name: userDisplayName }),
+
+      const session = parseUserSession(
+        loginResponse.data as Partial<UserSession> | undefined,
       );
-      onLoginSuccess(userDisplayName);
-      setSuccessMessage("Cliente cadastrado com sucesso.");
+
       setValues(initialFormValues);
       setCurrentStep(1);
+      onLoginSuccess(session);
       onClose();
     } catch (error: unknown) {
-      const responseData =
-        typeof error === "object" && error !== null && "response" in error
-          ? (error as { response?: { data?: unknown } }).response?.data
-          : undefined;
-      const message =
-        typeof responseData === "string"
-          ? responseData
-          : responseData
-            ? JSON.stringify(responseData)
-            : error instanceof Error
-              ? error.message
-              : String(error);
+      const message = extractErrorMessage(error);
 
-      setServerError(`Falha ao cadastrar cliente: ${message}`);
+      setServerError(
+        clientCreated
+          ? `Cliente cadastrado, mas houve falha no login automatico: ${message}`
+          : `Falha ao cadastrar cliente: ${message}`,
+      );
     } finally {
       setIsSubmitting(false);
     }

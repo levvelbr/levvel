@@ -15,14 +15,34 @@ export const SearchBar = ({
   autoFocusInput = false,
   ...rest
 }: Props) => {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(value ?? "");
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const lastEmittedQueryRef = useRef((value ?? "").trim());
 
   useEffect(() => {
     if (typeof value === "string") {
       setSearch(value);
     }
   }, [value]);
+
+  useEffect(() => {
+    if (!onSearch) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const nextQuery = search.trim();
+
+      if (nextQuery === lastEmittedQueryRef.current) {
+        return;
+      }
+
+      lastEmittedQueryRef.current = nextQuery;
+      onSearch(nextQuery);
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [search, onSearch]);
 
   useEffect(() => {
     if (autoFocusInput) {
@@ -32,12 +52,13 @@ export const SearchBar = ({
 
   const handleChange = (value: string) => {
     setSearch(value);
-    onSearch?.(value.trim());
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onSearch?.(search.trim());
+    const nextQuery = search.trim();
+    lastEmittedQueryRef.current = nextQuery;
+    onSearch?.(nextQuery);
   };
 
   return (

@@ -93,6 +93,9 @@ export const EstablishmentList = ({
 
   const titleSuffix = selectedCategory ? selectedCategory : "ativos";
   const hasSearch = normalizedSearch.length > 0;
+  const listTransitionKey = `${selectedCategory ?? "all"}|${normalizedSearch}|${filteredEstablishments
+    .map((item) => item.id)
+    .join(",")}`;
 
   return (
     <section className="mb-2 rounded-3xl bg-white/95 p-4 shadow-md ring-1 ring-slate-200 sm:p-6">
@@ -113,30 +116,38 @@ export const EstablishmentList = ({
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : filteredEstablishments.length === 0 ? (
-        <p className="text-sm text-slate-600">
+        <p className="establishment-mount text-sm text-slate-600">
           Nenhum estabelecimento encontrado para os filtros aplicados.
         </p>
       ) : (
-        <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
-          {filteredEstablishments.map((establishment) => (
-            <EstablishmentCard
+        <div
+          key={listTransitionKey}
+          className="grid gap-3 sm:gap-4 md:grid-cols-2"
+        >
+          {filteredEstablishments.map((establishment, index) => (
+            <div
               key={establishment.id}
-              id={establishment.id}
-              nome_estabelecimento={establishment.nome_estabelecimento}
-              telefone={establishment.telefone}
-              localizacao={establishment.localizacao}
-              foto_estabelecimento_url={
-                establishment.foto_estabelecimento_url ?? null
-              }
-              categoria={establishment.categoria}
-              servicos_oferecidos={establishment.servicos_oferecidos ?? []}
-              tecnicas_utilizadas={establishment.tecnicas_utilizadas ?? []}
-              produtos_aplicados={establishment.produtos_aplicados ?? []}
-              profissionais_envolvidos={
-                establishment.profissionais_envolvidos ?? []
-              }
-              onRequestBooking={(data) => onRequestBooking?.(data)}
-            />
+              className="establishment-mount"
+              style={{ animationDelay: `${Math.min(index, 7) * 60}ms` }}
+            >
+              <EstablishmentCard
+                id={establishment.id}
+                nome_estabelecimento={establishment.nome_estabelecimento}
+                telefone={establishment.telefone}
+                localizacao={establishment.localizacao}
+                foto_estabelecimento_url={
+                  establishment.foto_estabelecimento_url ?? null
+                }
+                categoria={establishment.categoria}
+                servicos_oferecidos={establishment.servicos_oferecidos ?? []}
+                tecnicas_utilizadas={establishment.tecnicas_utilizadas ?? []}
+                produtos_aplicados={establishment.produtos_aplicados ?? []}
+                profissionais_envolvidos={
+                  establishment.profissionais_envolvidos ?? []
+                }
+                onRequestBooking={(data) => onRequestBooking?.(data)}
+              />
+            </div>
           ))}
         </div>
       )}

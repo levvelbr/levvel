@@ -219,7 +219,7 @@ export const EstablishmentPublicPage = () => {
 
       <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
         <div className="mx-auto max-w-6xl">
-          <div className="mb-4">
+          <div className="establishment-mount mb-4">
             <Link
               to="/"
               className="inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -228,7 +228,7 @@ export const EstablishmentPublicPage = () => {
             </Link>
           </div>
 
-          <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <article className="establishment-mount establishment-mount-delay-1 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             {/* Hero image — always visible */}
             <div className="relative h-64 w-full bg-slate-100 sm:h-80 lg:h-96">
               {establishment.foto_estabelecimento_url ? (
@@ -245,7 +245,7 @@ export const EstablishmentPublicPage = () => {
             </div>
 
             {/* Content — toggles between details and booking form */}
-            <div className="space-y-6 p-5 sm:p-8">
+            <div className="establishment-mount establishment-mount-delay-2 space-y-6 p-5 sm:p-8">
               {!showBookingForm ? (
                 <>
                   <div className="flex flex-wrap items-start justify-between gap-4">

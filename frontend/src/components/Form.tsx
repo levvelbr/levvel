@@ -410,6 +410,12 @@ const parseCsv = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const ErrorBadge = ({ message }: { message: string }) => (
+  <span className="mt-1 inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
+    {message}
+  </span>
+);
+
 export const Form = () => {
   const [values, setValues] = useState<FormValues>(initialFormValues);
   const [schedule, setSchedule] = useState<WeeklySchedule>(
@@ -879,9 +885,7 @@ export const Form = () => {
                 placeholder="Nome do estabelecimento"
               />
               {errors.nome_estabelecimento && (
-                <span className="text-sm text-red-500">
-                  {errors.nome_estabelecimento}
-                </span>
+                <ErrorBadge message={errors.nome_estabelecimento} />
               )}
             </label>
 
@@ -896,9 +900,7 @@ export const Form = () => {
                 placeholder="Nome do responsável"
               />
               {errors.responsavel && (
-                <span className="text-sm text-red-500">
-                  {errors.responsavel}
-                </span>
+                <ErrorBadge message={errors.responsavel} />
               )}
             </label>
 
@@ -935,7 +937,7 @@ export const Form = () => {
                 placeholder="(00) 00000-0000"
               />
               {errors.telefone && (
-                <span className="text-sm text-red-500">{errors.telefone}</span>
+                <ErrorBadge message={errors.telefone} />
               )}
             </label>
 
@@ -951,7 +953,7 @@ export const Form = () => {
                 placeholder="user@example.com"
               />
               {errors.email && (
-                <span className="text-sm text-red-500">{errors.email}</span>
+                <ErrorBadge message={errors.email} />
               )}
             </label>
 
@@ -966,9 +968,7 @@ export const Form = () => {
                 placeholder="Endereço, bairro ou cidade"
               />
               {errors.localizacao && (
-                <span className="text-sm text-red-500">
-                  {errors.localizacao}
-                </span>
+                <ErrorBadge message={errors.localizacao} />
               )}
             </label>
 
@@ -981,7 +981,7 @@ export const Form = () => {
                 placeholder="00.000.000/0000-00"
               />
               {errors.cnpj && (
-                <span className="text-sm text-red-500">{errors.cnpj}</span>
+                <ErrorBadge message={errors.cnpj} />
               )}
             </label>
 
@@ -996,9 +996,7 @@ export const Form = () => {
                 placeholder="Razão social da empresa"
               />
               {errors.razao_social && (
-                <span className="text-sm text-red-500">
-                  {errors.razao_social}
-                </span>
+                <ErrorBadge message={errors.razao_social} />
               )}
             </label>
           </>
@@ -1125,9 +1123,7 @@ export const Form = () => {
                                   }`}
                                 />
                                 {rangeErrors?.inicio && !rangeErrors.row ? (
-                                  <span className="mt-1 block text-xs text-rose-600">
-                                    {rangeErrors.inicio}
-                                  </span>
+                                  <ErrorBadge message={rangeErrors.inicio} />
                                 ) : null}
                               </div>
                               <span className="hidden text-center text-sm font-medium text-slate-500 sm:block">
@@ -1164,9 +1160,7 @@ export const Form = () => {
                                   }`}
                                 />
                                 {rangeErrors?.fim && !rangeErrors.row ? (
-                                  <span className="mt-1 block text-xs text-rose-600">
-                                    {rangeErrors.fim}
-                                  </span>
+                                  <ErrorBadge message={rangeErrors.fim} />
                                 ) : null}
                               </div>
                               <button
@@ -1191,9 +1185,7 @@ export const Form = () => {
               </div>
 
               {errors.horario_funcionamento ? (
-                <span className="mt-3 block text-sm text-red-500">
-                  {errors.horario_funcionamento}
-                </span>
+                <ErrorBadge message={errors.horario_funcionamento} />
               ) : null}
             </div>
           ) : (
@@ -1215,7 +1207,7 @@ export const Form = () => {
                 ))}
               </select>
               {errors.categoria && (
-                <span className="text-sm text-red-500">{errors.categoria}</span>
+                <ErrorBadge message={errors.categoria} />
               )}
             </label>
 
@@ -1230,7 +1222,7 @@ export const Form = () => {
                 placeholder="@seu_instagram"
               />
               {errors.instagram && (
-                <span className="text-sm text-red-500">{errors.instagram}</span>
+                <ErrorBadge message={errors.instagram} />
               )}
             </label>
 
@@ -1289,9 +1281,7 @@ export const Form = () => {
                 placeholder="Digite separados por vírgula"
               />
               {errors.profissionais_envolvidos && (
-                <span className="text-sm text-red-500">
-                  {errors.profissionais_envolvidos}
-                </span>
+                <ErrorBadge message={errors.profissionais_envolvidos} />
               )}
             </label>
 
@@ -1341,9 +1331,7 @@ export const Form = () => {
               </div>
 
               {errors.horario_funcionamento ? (
-                <span className="block text-sm text-red-500">
-                  {errors.horario_funcionamento}
-                </span>
+                <ErrorBadge message={errors.horario_funcionamento} />
               ) : null}
             </div>
           </>
@@ -1364,9 +1352,7 @@ export const Form = () => {
                 placeholder="Senha do estabelecimento"
               />
               {errors.senha_hash && (
-                <span className="text-sm text-red-500">
-                  {errors.senha_hash}
-                </span>
+                <ErrorBadge message={errors.senha_hash} />
               )}
             </label>
 
@@ -1382,9 +1368,7 @@ export const Form = () => {
                 placeholder="Repita a senha"
               />
               {errors.confirmar_senha && (
-                <span className="text-sm text-red-500">
-                  {errors.confirmar_senha}
-                </span>
+                <ErrorBadge message={errors.confirmar_senha} />
               )}
             </label>
 
@@ -1411,9 +1395,7 @@ export const Form = () => {
                 </span>
               </label>
               {errors.aceitou_termos ? (
-                <span className="mt-2 block text-sm text-red-500">
-                  {errors.aceitou_termos}
-                </span>
+                <ErrorBadge message={errors.aceitou_termos} />
               ) : null}
             </div>
           </>

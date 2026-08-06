@@ -11,6 +11,9 @@ interface LoginFormValues {
 }
 
 interface LoginFormProps {
+  isClosing?: boolean;
+  isMorphingToRegister?: boolean;
+  disableEnterAnimation?: boolean;
   onClose: () => void;
   onLoginSuccess: (session: UserSession) => void;
   onSwitchToRegister: () => void;
@@ -22,6 +25,9 @@ const initialValues: LoginFormValues = {
 };
 
 export const LoginForm = ({
+  isClosing = false,
+  isMorphingToRegister = false,
+  disableEnterAnimation = false,
   onClose,
   onLoginSuccess,
   onSwitchToRegister,
@@ -121,74 +127,100 @@ export const LoginForm = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4"
+      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
+        isClosing
+          ? "auth-modal-overlay-exit"
+          : disableEnterAnimation
+            ? ""
+            : "auth-modal-overlay-enter"
+      }`}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl sm:p-6"
+        className={`auth-modal-panel w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl transition-[max-width] duration-300 ease-in-out sm:p-6 ${
+          isMorphingToRegister ? "max-w-2xl" : "max-w-md"
+        } ${
+          isClosing
+            ? "auth-modal-panel-exit"
+            : disableEnterAnimation
+              ? ""
+              : "auth-modal-panel-enter"
+        }`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold text-emerald-900">Entrar</h2>
-            <p className="text-sm text-slate-600">
-              Acesse sua conta para continuar
-            </p>
+        <div
+          className={
+            isMorphingToRegister
+              ? "auth-modal-content-exit"
+              : "auth-modal-content-enter"
+          }
+        >
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold text-emerald-900">
+                Entrar
+              </h2>
+              <p className="text-sm text-slate-600">
+                Acesse sua conta para continuar
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+              aria-label="Fechar formulário"
+            >
+              ✕
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
-            aria-label="Fechar formulário"
-          >
-            ✕
-          </button>
-        </div>
 
-        {error ? (
-          <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-900">
-            {error}
+          {error ? (
+            <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-900">
+              {error}
+            </div>
+          ) : null}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <label className="space-y-2 block">
+              <span className="text-sm font-medium text-slate-700">
+                E-mail ou CPF/CNPJ *
+              </span>
+              <Input
+                name="identificador"
+                value={values.identificador}
+                onChange={handleChange}
+                placeholder="Digite seu e-mail ou CPF/CNPJ"
+              />
+            </label>
+
+            <label className="space-y-2 block">
+              <span className="text-sm font-medium text-slate-700">
+                Senha *
+              </span>
+              <Input
+                type="password"
+                name="senha"
+                value={values.senha}
+                onChange={handleChange}
+                placeholder="Digite sua senha"
+              />
+            </label>
+
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? "Entrando..." : "Entrar"}
+            </Button>
+          </form>
+
+          <div className="mt-4 text-center text-sm text-slate-600">
+            Ainda não tem conta?{" "}
+            <button
+              type="button"
+              onClick={onSwitchToRegister}
+              className="font-semibold text-emerald-700 hover:underline"
+            >
+              Cadastre-se
+            </button>
           </div>
-        ) : null}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <label className="space-y-2 block">
-            <span className="text-sm font-medium text-slate-700">
-              E-mail ou CPF/CNPJ *
-            </span>
-            <Input
-              name="identificador"
-              value={values.identificador}
-              onChange={handleChange}
-              placeholder="Digite seu e-mail ou CPF/CNPJ"
-            />
-          </label>
-
-          <label className="space-y-2 block">
-            <span className="text-sm font-medium text-slate-700">Senha *</span>
-            <Input
-              type="password"
-              name="senha"
-              value={values.senha}
-              onChange={handleChange}
-              placeholder="Digite sua senha"
-            />
-          </label>
-
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Entrando..." : "Entrar"}
-          </Button>
-        </form>
-
-        <div className="mt-4 text-center text-sm text-slate-600">
-          Ainda não tem conta?{" "}
-          <button
-            type="button"
-            onClick={onSwitchToRegister}
-            className="font-semibold text-emerald-700 hover:underline"
-          >
-            Cadastre-se
-          </button>
         </div>
       </div>
     </div>

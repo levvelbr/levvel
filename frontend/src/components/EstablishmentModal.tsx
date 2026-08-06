@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { Form } from "./Form";
+
+const MODAL_EXIT_DURATION_MS = 220;
 
 interface EstablishmentModalProps {
   isOpen: boolean;
@@ -12,19 +15,47 @@ export const EstablishmentModal = ({
   onClose,
   onOpenLogin,
 }: EstablishmentModalProps) => {
-  useBodyScrollLock(isOpen);
+  const [isRendered, setIsRendered] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
 
-  if (!isOpen) {
+  useBodyScrollLock(isRendered);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsRendered(true);
+      setIsClosing(false);
+      return;
+    }
+
+    if (!isRendered) {
+      return;
+    }
+
+    setIsClosing(true);
+
+    const timeoutId = window.setTimeout(() => {
+      setIsRendered(false);
+      setIsClosing(false);
+    }, MODAL_EXIT_DURATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isOpen, isRendered]);
+
+  if (!isRendered) {
     return null;
   }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4"
+      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
+        isClosing ? "auth-modal-overlay-exit" : "auth-modal-overlay-enter"
+      }`}
       onClick={onClose}
     >
       <div
-        className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+        className={`auth-modal-panel flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ${
+          isClosing ? "auth-modal-panel-exit" : "auth-modal-panel-enter"
+        }`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">

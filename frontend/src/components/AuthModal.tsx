@@ -4,6 +4,9 @@ import { LoginForm } from "./LoginForm";
 import type { UserSession } from "../types/auth";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
+const MODAL_EXIT_DURATION_MS = 220;
+const FORM_SWITCH_DURATION_MS = 230;
+
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -15,55 +18,92 @@ export const AuthModal = ({
   onClose,
   onAuthChange,
 }: AuthModalProps) => {
-  const [isLoginFormOpen, setIsLoginFormOpen] = useState(true);
-  const [isClientFormOpen, setIsClientFormOpen] = useState(false);
+  const [isRendered, setIsRendered] = useState(isOpen);
+  const [isModalClosing, setIsModalClosing] = useState(false);
+  const [isSwitchingForm, setIsSwitchingForm] = useState(false);
+  const [enterMode, setEnterMode] = useState<"normal" | "switch">("normal");
+  const [activeForm, setActiveForm] = useState<"login" | "register">("login");
 
-  useBodyScrollLock(isOpen);
+  useBodyScrollLock(isRendered);
 
   useEffect(() => {
     if (isOpen) {
-      setIsLoginFormOpen(true);
-      setIsClientFormOpen(false);
+      setIsRendered(true);
+      setIsModalClosing(false);
+      setIsSwitchingForm(false);
+      setEnterMode("normal");
+      setActiveForm("login");
+      return;
     }
-  }, [isOpen]);
 
-  if (!isOpen) {
+    if (!isRendered) {
+      return;
+    }
+
+    setIsModalClosing(true);
+
+    const timeoutId = window.setTimeout(() => {
+      setIsRendered(false);
+      setIsModalClosing(false);
+      setIsSwitchingForm(false);
+      setEnterMode("normal");
+      setActiveForm("login");
+    }, MODAL_EXIT_DURATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isOpen, isRendered]);
+
+  if (!isRendered) {
     return null;
   }
 
+  const switchForm = (nextForm: "login" | "register") => {
+    if (isModalClosing || isSwitchingForm || activeForm === nextForm) {
+      return;
+    }
+
+    setIsSwitchingForm(true);
+
+    window.setTimeout(() => {
+      setActiveForm(nextForm);
+      setEnterMode("switch");
+      setIsSwitchingForm(false);
+    }, FORM_SWITCH_DURATION_MS);
+  };
+
   return (
     <>
-      {isLoginFormOpen ? (
+      {activeForm === "login" ? (
         <LoginForm
+          isClosing={isModalClosing}
+          isMorphingToRegister={isSwitchingForm && activeForm === "login"}
+          disableEnterAnimation={enterMode === "switch"}
           onClose={() => {
-            setIsLoginFormOpen(true);
             onClose();
           }}
           onLoginSuccess={(session) => {
             onAuthChange?.(session);
-            setIsLoginFormOpen(false);
           }}
           onSwitchToRegister={() => {
-            setIsLoginFormOpen(false);
-            setIsClientFormOpen(true);
+            switchForm("register");
           }}
         />
       ) : null}
 
-      {isClientFormOpen ? (
+      {activeForm === "register" ? (
         <ClientForm
+          isClosing={isModalClosing}
+          isMorphingToLogin={isSwitchingForm && activeForm === "register"}
+          disableEnterAnimation={enterMode === "switch"}
           onClose={() => {
-            setIsClientFormOpen(false);
             onClose();
           }}
           onLoginSuccess={(session) => {
             onAuthChange?.(session);
-            setIsClientFormOpen(false);
             onClose();
           }}
           onBackToLogin={() => {
-            setIsClientFormOpen(false);
-            setIsLoginFormOpen(true);
+            switchForm("login");
           }}
         />
       ) : null}

@@ -3,6 +3,7 @@ import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
 import type { UserSession } from "../types/auth";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface ClientFormValues {
   nome_usuario: string;
@@ -94,6 +95,8 @@ export const ClientForm = ({
   onLoginSuccess,
   onBackToLogin,
 }: ClientFormProps) => {
+  useBodyScrollLock(true);
+
   const [values, setValues] = useState<ClientFormValues>(initialFormValues);
   const [errors, setErrors] = useState<ClientFormErrors>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -101,8 +104,7 @@ export const ClientForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [showTermsAlert, setShowTermsAlert] = useState(false);
-  const [hasAttemptedSubmitStep2, setHasAttemptedSubmitStep2] =
-    useState(false);
+  const [hasAttemptedSubmitStep2, setHasAttemptedSubmitStep2] = useState(false);
 
   useEffect(() => {
     if (currentStep === 2) {
@@ -117,7 +119,8 @@ export const ClientForm = ({
   ) => {
     const { name } = event.target;
     const nextValue =
-      event.target instanceof HTMLInputElement && event.target.type === "checkbox"
+      event.target instanceof HTMLInputElement &&
+      event.target.type === "checkbox"
         ? event.target.checked
         : event.target.value;
 
@@ -180,7 +183,8 @@ export const ClientForm = ({
         nextErrors.confirmar_senha = "As senhas não conferem";
       }
       if (!formValues.aceitou_termos) {
-        nextErrors.aceitou_termos = "Voce precisa aceitar os termos para continuar";
+        nextErrors.aceitou_termos =
+          "Voce precisa aceitar os termos para continuar";
       }
     }
 
@@ -218,9 +222,7 @@ export const ClientForm = ({
     event.preventDefault();
 
     const nativeSubmitEvent = event.nativeEvent as SubmitEvent;
-    const submitter = nativeSubmitEvent.submitter as
-      | HTMLButtonElement
-      | null;
+    const submitter = nativeSubmitEvent.submitter as HTMLButtonElement | null;
     const isFinalSubmit =
       submitter?.getAttribute("data-submit-intent") === "register-client";
 
@@ -295,8 +297,14 @@ export const ClientForm = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-3 py-4 sm:px-4">
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl sm:p-6">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl sm:p-6"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="mb-6 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold text-emerald-900">

@@ -3,6 +3,7 @@ import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
 import type { UserSession } from "../types/auth";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface LoginFormValues {
   identificador: string;
@@ -25,6 +26,8 @@ export const LoginForm = ({
   onLoginSuccess,
   onSwitchToRegister,
 }: LoginFormProps) => {
+  useBodyScrollLock(true);
+
   const [values, setValues] = useState<LoginFormValues>(initialValues);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -118,7 +121,7 @@ export const LoginForm = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-3 py-4 sm:px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4"
       onClick={onClose}
     >
       <div
@@ -151,13 +154,13 @@ export const LoginForm = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="space-y-2 block">
             <span className="text-sm font-medium text-slate-700">
-              E-mail ou CPF *
+              E-mail ou CPF/CNPJ *
             </span>
             <Input
               name="identificador"
               value={values.identificador}
               onChange={handleChange}
-              placeholder="Digite seu e-mail ou CPF"
+              placeholder="Digite seu e-mail ou CPF/CNPJ"
             />
           </label>
 

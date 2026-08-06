@@ -1,3 +1,4 @@
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { Form } from "./Form";
 
 interface EstablishmentModalProps {
@@ -11,6 +12,8 @@ export const EstablishmentModal = ({
   onClose,
   onOpenLogin,
 }: EstablishmentModalProps) => {
+  useBodyScrollLock(isOpen);
+
   if (!isOpen) {
     return null;
   }

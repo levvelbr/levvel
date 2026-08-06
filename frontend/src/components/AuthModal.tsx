@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ClientForm } from "./ClientForm";
 import { LoginForm } from "./LoginForm";
 import type { UserSession } from "../types/auth";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ export const AuthModal = ({
 }: AuthModalProps) => {
   const [isLoginFormOpen, setIsLoginFormOpen] = useState(true);
   const [isClientFormOpen, setIsClientFormOpen] = useState(false);
+
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     if (isOpen) {

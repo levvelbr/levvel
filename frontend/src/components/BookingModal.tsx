@@ -1,4 +1,5 @@
 import { BookingForm, type BookingEstablishment } from "./BookingForm";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 export type { BookingEstablishment };
 
@@ -13,6 +14,8 @@ export const BookingModal = ({
   onClose,
   establishment,
 }: BookingModalProps) => {
+  useBodyScrollLock(isOpen && Boolean(establishment));
+
   if (!isOpen || !establishment) return null;
 
   return (

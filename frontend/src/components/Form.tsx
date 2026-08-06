@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
@@ -17,13 +17,50 @@ interface FormValues {
   tecnicas_utilizadas: string;
   produtos_aplicados: string;
   profissionais_envolvidos: string;
-  horario_funcionamento: string;
   senha_hash: string;
   confirmar_senha: string;
   aceitou_termos: boolean;
 }
 
-type FormErrors = Partial<Record<keyof FormValues, string>>;
+type WeekDayKey =
+  | "segunda"
+  | "terca"
+  | "quarta"
+  | "quinta"
+  | "sexta"
+  | "sabado"
+  | "domingo";
+
+interface TimeRange {
+  inicio: string;
+  fim: string;
+}
+
+interface DaySchedule {
+  ativo: boolean;
+  faixas: TimeRange[];
+}
+
+interface RangeFieldError {
+  inicio?: string;
+  fim?: string;
+  row?: string;
+}
+
+interface ScheduleValidationResult {
+  message: string | null;
+  fieldErrors: Record<string, RangeFieldError>;
+}
+
+interface DayErrorBadge {
+  hasError: boolean;
+  message: string | null;
+}
+
+type WeeklySchedule = Record<WeekDayKey, DaySchedule>;
+
+type FormField = keyof FormValues | "horario_funcionamento";
+type FormErrors = Partial<Record<FormField, string>>;
 
 const categoryOptions = [
   "Geral",
@@ -33,6 +70,312 @@ const categoryOptions = [
   "Spa",
   "Estética",
 ];
+
+const weekDays: Array<{ key: WeekDayKey; label: string; shortLabel: string }> = [
+  { key: "segunda", label: "Segunda-feira", shortLabel: "Seg" },
+  { key: "terca", label: "Terça-feira", shortLabel: "Ter" },
+  { key: "quarta", label: "Quarta-feira", shortLabel: "Qua" },
+  { key: "quinta", label: "Quinta-feira", shortLabel: "Qui" },
+  { key: "sexta", label: "Sexta-feira", shortLabel: "Sex" },
+  { key: "sabado", label: "Sábado", shortLabel: "Sáb" },
+  { key: "domingo", label: "Domingo", shortLabel: "Dom" },
+];
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+const createEmptyRange = (): TimeRange => ({ inicio: "", fim: "" });
+
+const createInitialSchedule = (): WeeklySchedule =>
+  weekDays.reduce(
+    (acc, day) => {
+      acc[day.key] = {
+        ativo: false,
+        faixas: [createEmptyRange()],
+      };
+
+      return acc;
+    },
+    {} as WeeklySchedule,
+  );
+
+const cloneSchedule = (schedule: WeeklySchedule): WeeklySchedule =>
+  weekDays.reduce(
+    (acc, day) => {
+      const daySchedule = schedule[day.key];
+
+      acc[day.key] = {
+        ativo: daySchedule.ativo,
+        faixas: daySchedule.faixas.map((range) => ({ ...range })),
+      };
+
+      return acc;
+    },
+    {} as WeeklySchedule,
+  );
+
+const toMinutes = (value: string) => {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
+const getRangeErrorKey = (dayKey: WeekDayKey, index: number) =>
+  `${dayKey}-${index}`;
+
+const getRangeInputRefKey = (
+  dayKey: WeekDayKey,
+  index: number,
+  field: keyof TimeRange,
+) => `${dayKey}-${index}-${field}`;
+
+const setFieldError = (
+  errors: Record<string, RangeFieldError>,
+  key: string,
+  nextError: RangeFieldError,
+) => {
+  errors[key] = {
+    ...errors[key],
+    ...nextError,
+  };
+};
+
+const getDayErrorBadge = (
+  dayKey: WeekDayKey,
+  fieldErrors: Record<string, RangeFieldError>,
+): DayErrorBadge => {
+  for (const [key, value] of Object.entries(fieldErrors)) {
+    if (!key.startsWith(`${dayKey}-`)) {
+      continue;
+    }
+
+    return {
+      hasError: true,
+      message: value.row ?? value.inicio ?? value.fim ?? "Ajuste as faixas",
+    };
+  }
+
+  return {
+    hasError: false,
+    message: null,
+  };
+};
+
+const formatTimeInput = (rawValue: string) => {
+  const digits = rawValue.replace(/\D/g, "").slice(0, 4);
+
+  if (!digits.length) {
+    return "";
+  }
+
+  if (digits.length <= 2) {
+    return digits;
+  }
+
+  if (digits.length === 3) {
+    return `${digits.slice(0, 1)}:${digits.slice(1)}`;
+  }
+
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+};
+
+const normalizeTimeOnBlur = (rawValue: string) => {
+  const digits = rawValue.replace(/\D/g, "").slice(0, 4);
+
+  if (!digits.length) {
+    return "";
+  }
+
+  if (digits.length <= 2) {
+    const hour = Number(digits);
+
+    if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
+      return `${String(hour).padStart(2, "0")}:00`;
+    }
+
+    return rawValue;
+  }
+
+  if (digits.length === 3) {
+    const hour = Number(digits.slice(0, 1));
+    const minutes = Number(digits.slice(1));
+
+    if (
+      !Number.isNaN(hour) &&
+      !Number.isNaN(minutes) &&
+      hour >= 0 &&
+      hour <= 23 &&
+      minutes >= 0 &&
+      minutes <= 59
+    ) {
+      return `${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    }
+
+    return rawValue;
+  }
+
+  const hour = Number(digits.slice(0, 2));
+  const minutes = Number(digits.slice(2));
+
+  if (
+    !Number.isNaN(hour) &&
+    !Number.isNaN(minutes) &&
+    hour >= 0 &&
+    hour <= 23 &&
+    minutes >= 0 &&
+    minutes <= 59
+  ) {
+    return `${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }
+
+  return rawValue;
+};
+
+const validateSchedule = (schedule: WeeklySchedule): ScheduleValidationResult => {
+  const activeDays = weekDays.filter((day) => schedule[day.key].ativo);
+  const fieldErrors: Record<string, RangeFieldError> = {};
+
+  if (!activeDays.length) {
+    return {
+      message: "Selecione pelo menos um dia de funcionamento.",
+      fieldErrors,
+    };
+  }
+
+  for (const day of activeDays) {
+    const ranges = schedule[day.key].faixas;
+
+    if (!ranges.length) {
+      return {
+        message: `Adicione ao menos uma faixa de horário para ${day.label}.`,
+        fieldErrors,
+      };
+    }
+
+    for (const [index, range] of ranges.entries()) {
+      const rangeErrorKey = getRangeErrorKey(day.key, index);
+
+      if (!range.inicio || !range.fim) {
+        setFieldError(fieldErrors, rangeErrorKey, {
+          inicio: !range.inicio ? "Informe início." : undefined,
+          fim: !range.fim ? "Informe fim." : undefined,
+          row: "Complete os dois horários.",
+        });
+
+        return {
+          message: `Preencha início e fim para ${day.label} (faixa ${index + 1}).`,
+          fieldErrors,
+        };
+      }
+
+      if (!TIME_PATTERN.test(range.inicio) || !TIME_PATTERN.test(range.fim)) {
+        setFieldError(fieldErrors, rangeErrorKey, {
+          inicio: !TIME_PATTERN.test(range.inicio)
+            ? "Formato HH:mm."
+            : undefined,
+          fim: !TIME_PATTERN.test(range.fim)
+            ? "Formato HH:mm."
+            : undefined,
+          row: "Corrija para HH:mm.",
+        });
+
+        return {
+          message: `Use o padrão HH:mm em ${day.label} (faixa ${index + 1}).`,
+          fieldErrors,
+        };
+      }
+
+      const startMinutes = toMinutes(range.inicio);
+      const endMinutes = toMinutes(range.fim);
+
+      if (endMinutes <= startMinutes) {
+        const isEqualTimes = endMinutes === startMinutes;
+
+        setFieldError(fieldErrors, rangeErrorKey, {
+          inicio: isEqualTimes
+            ? "Não repita o mesmo horário."
+            : "Início maior que fim.",
+          fim: isEqualTimes
+            ? "Não repita o mesmo horário."
+            : "Fim menor que início.",
+          row: isEqualTimes
+            ? "Os horários não devem ser iguais."
+            : "A faixa está invertida.",
+        });
+
+        return {
+          message: isEqualTimes
+            ? `Em ${day.label}, os horários da faixa ${index + 1} não devem ser iguais.`
+            : `Em ${day.label}, o horário final deve ser maior que o inicial (faixa ${index + 1}).`,
+          fieldErrors,
+        };
+      }
+    }
+
+    const rangesWithMinutes = ranges.map((range, index) => ({
+      index,
+      inicio: toMinutes(range.inicio),
+      fim: toMinutes(range.fim),
+    }));
+
+    const sortedRanges = [...rangesWithMinutes].sort(
+      (a, b) => a.inicio - b.inicio,
+    );
+
+    for (let i = 1; i < sortedRanges.length; i += 1) {
+      const previousRange = sortedRanges[i - 1];
+      const currentRange = sortedRanges[i];
+
+      if (currentRange.inicio < previousRange.fim) {
+        setFieldError(
+          fieldErrors,
+          getRangeErrorKey(day.key, previousRange.index),
+          {
+            inicio: "Conflito com outra faixa.",
+            fim: "Conflito com outra faixa.",
+            row: "Esta faixa sobrepõe outra.",
+          },
+        );
+
+        setFieldError(
+          fieldErrors,
+          getRangeErrorKey(day.key, currentRange.index),
+          {
+            inicio: "Conflito com outra faixa.",
+            fim: "Conflito com outra faixa.",
+            row: "Esta faixa sobrepõe outra.",
+          },
+        );
+
+        return {
+          message: `As faixas ${previousRange.index + 1} e ${currentRange.index + 1} de ${day.label} estão sobrepostas.`,
+          fieldErrors,
+        };
+      }
+    }
+  }
+
+  return {
+    message: null,
+    fieldErrors,
+  };
+};
+
+const buildSchedulePayload = (schedule: WeeklySchedule) =>
+  weekDays.reduce(
+    (acc, day) => {
+      const daySchedule = schedule[day.key];
+
+      if (!daySchedule.ativo) {
+        return acc;
+      }
+
+      acc[day.key] = daySchedule.faixas
+        .map((range) => `${range.inicio}-${range.fim}`)
+        .join(", ");
+
+      return acc;
+    },
+    {} as Record<string, string>,
+  );
 
 const initialFormValues: FormValues = {
   nome_estabelecimento: "",
@@ -48,7 +391,6 @@ const initialFormValues: FormValues = {
   tecnicas_utilizadas: "",
   produtos_aplicados: "",
   profissionais_envolvidos: "",
-  horario_funcionamento: "",
   senha_hash: "",
   confirmar_senha: "",
   aceitou_termos: false,
@@ -70,6 +412,16 @@ const parseCsv = (value: string) =>
 
 export const Form = () => {
   const [values, setValues] = useState<FormValues>(initialFormValues);
+  const [schedule, setSchedule] = useState<WeeklySchedule>(
+    createInitialSchedule(),
+  );
+  const [draftSchedule, setDraftSchedule] = useState<WeeklySchedule>(
+    createInitialSchedule(),
+  );
+  const [scheduleFieldErrors, setScheduleFieldErrors] = useState<
+    Record<string, RangeFieldError>
+  >({});
+  const [isScheduleEditorOpen, setIsScheduleEditorOpen] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoInputKey, setPhotoInputKey] = useState(0);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -77,6 +429,7 @@ export const Form = () => {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const scheduleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const stepTitles = [
     "Dados principais",
@@ -117,6 +470,208 @@ export const Form = () => {
     });
     setServerError(null);
     setSuccessMessage(null);
+  };
+
+  const clearScheduleError = () => {
+    setErrors((prev) => {
+      if (!prev.horario_funcionamento) {
+        return prev;
+      }
+
+      const nextErrors = { ...prev };
+      delete nextErrors.horario_funcionamento;
+      return nextErrors;
+    });
+
+    setScheduleFieldErrors({});
+  };
+
+  const handleToggleDay = (dayKey: WeekDayKey, checked: boolean) => {
+    setDraftSchedule((prev) => ({
+      ...prev,
+      [dayKey]: {
+        ...prev[dayKey],
+        ativo: checked,
+      },
+    }));
+    clearScheduleError();
+    setServerError(null);
+    setSuccessMessage(null);
+  };
+
+  const handleRangeChange = (
+    dayKey: WeekDayKey,
+    index: number,
+    field: keyof TimeRange,
+    value: string,
+  ) => {
+    const normalizedValue = formatTimeInput(value);
+
+    setDraftSchedule((prev) => {
+      const updatedRanges = prev[dayKey].faixas.map((range, rangeIndex) =>
+        rangeIndex === index ? { ...range, [field]: normalizedValue } : range,
+      );
+
+      return {
+        ...prev,
+        [dayKey]: {
+          ...prev[dayKey],
+          faixas: updatedRanges,
+        },
+      };
+    });
+    clearScheduleError();
+    setServerError(null);
+    setSuccessMessage(null);
+  };
+
+  const handleRangeBlur = (
+    dayKey: WeekDayKey,
+    index: number,
+    field: keyof TimeRange,
+  ) => {
+    setDraftSchedule((prev) => {
+      const currentValue = prev[dayKey].faixas[index][field];
+      const normalizedValue = normalizeTimeOnBlur(currentValue);
+
+      if (currentValue === normalizedValue) {
+        return prev;
+      }
+
+      const updatedRanges = prev[dayKey].faixas.map((range, rangeIndex) =>
+        rangeIndex === index ? { ...range, [field]: normalizedValue } : range,
+      );
+
+      return {
+        ...prev,
+        [dayKey]: {
+          ...prev[dayKey],
+          faixas: updatedRanges,
+        },
+      };
+    });
+  };
+
+  const handleAddRange = (dayKey: WeekDayKey) => {
+    setDraftSchedule((prev) => ({
+      ...prev,
+      [dayKey]: {
+        ...prev[dayKey],
+        faixas: [...prev[dayKey].faixas, createEmptyRange()],
+      },
+    }));
+    clearScheduleError();
+    setServerError(null);
+    setSuccessMessage(null);
+  };
+
+  const handleRemoveRange = (dayKey: WeekDayKey, index: number) => {
+    setDraftSchedule((prev) => {
+      const nextRanges = prev[dayKey].faixas.filter(
+        (_, rangeIndex) => rangeIndex !== index,
+      );
+
+      return {
+        ...prev,
+        [dayKey]: {
+          ...prev[dayKey],
+          faixas: nextRanges.length ? nextRanges : [createEmptyRange()],
+        },
+      };
+    });
+    clearScheduleError();
+    setServerError(null);
+    setSuccessMessage(null);
+  };
+
+  const getCompactScheduleSummary = () => {
+    const activeDays = weekDays.filter((day) => schedule[day.key].ativo);
+
+    if (!activeDays.length) {
+      return [];
+    }
+
+    return activeDays.map((day) => {
+      const ranges = schedule[day.key].faixas
+        .map((range) => `${range.inicio}-${range.fim}`)
+        .join(" | ");
+
+      return `${day.shortLabel}: ${ranges}`;
+    });
+  };
+
+  const openScheduleEditor = () => {
+    setDraftSchedule(cloneSchedule(schedule));
+    setScheduleFieldErrors({});
+    setIsScheduleEditorOpen(true);
+    setServerError(null);
+    setSuccessMessage(null);
+  };
+
+  const closeScheduleEditor = () => {
+    setDraftSchedule(cloneSchedule(schedule));
+    setScheduleFieldErrors({});
+    setIsScheduleEditorOpen(false);
+  };
+
+  const handleSaveSchedule = () => {
+    const validation = validateSchedule(draftSchedule);
+
+    if (validation.message) {
+      setScheduleFieldErrors(validation.fieldErrors);
+      setErrors((prev) => ({
+        ...prev,
+        horario_funcionamento: validation.message ?? undefined,
+      }));
+
+      const focusOrder: Array<keyof TimeRange> = ["inicio", "fim"];
+
+      for (const day of weekDays) {
+        const dayRanges = draftSchedule[day.key].faixas;
+
+        for (let index = 0; index < dayRanges.length; index += 1) {
+          const fieldError = validation.fieldErrors[
+            getRangeErrorKey(day.key, index)
+          ];
+
+          if (!fieldError) {
+            continue;
+          }
+
+          for (const field of focusOrder) {
+            if (!fieldError[field]) {
+              continue;
+            }
+
+            const inputRef =
+              scheduleInputRefs.current[
+                getRangeInputRefKey(day.key, index, field)
+              ];
+
+            if (inputRef) {
+              setTimeout(() => {
+                inputRef.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                  inline: "nearest",
+                });
+                inputRef.focus();
+                inputRef.select();
+              }, 0);
+            }
+
+            return;
+          }
+        }
+      }
+
+      return;
+    }
+
+    setScheduleFieldErrors({});
+    setSchedule(cloneSchedule(draftSchedule));
+    clearScheduleError();
+    setIsScheduleEditorOpen(false);
   };
 
   const validateStep = (stepNumber: number, formValues: FormValues) => {
@@ -162,16 +717,9 @@ export const Form = () => {
         newErrors.profissionais_envolvidos =
           "Profissionais envolvidos são obrigatórios";
       }
-      if (!formValues.horario_funcionamento.trim()) {
-        newErrors.horario_funcionamento =
-          "Horário de funcionamento é obrigatório";
-      } else {
-        try {
-          JSON.parse(formValues.horario_funcionamento);
-        } catch {
-          newErrors.horario_funcionamento =
-            "Horário de funcionamento deve ser um objeto JSON válido";
-        }
+      const scheduleValidation = validateSchedule(schedule);
+      if (scheduleValidation.message) {
+        newErrors.horario_funcionamento = scheduleValidation.message;
       }
     }
 
@@ -235,7 +783,7 @@ export const Form = () => {
       tecnicas_utilizadas: parseCsv(values.tecnicas_utilizadas),
       produtos_aplicados: parseCsv(values.produtos_aplicados),
       profissionais_envolvidos: parseCsv(values.profissionais_envolvidos),
-      horario_funcionamento: JSON.parse(values.horario_funcionamento),
+      horario_funcionamento: buildSchedulePayload(schedule),
       senha_hash: values.senha_hash,
       aceitou_termos: values.aceitou_termos,
     };
@@ -248,6 +796,9 @@ export const Form = () => {
       await api.post("/v1/estabelecimentos/", body);
       setSuccessMessage("Estabelecimento cadastrado com sucesso.");
       setValues(initialFormValues);
+      setSchedule(createInitialSchedule());
+      setDraftSchedule(createInitialSchedule());
+      setIsScheduleEditorOpen(false);
       setPhotoFile(null);
       setPhotoInputKey((prev) => prev + 1);
       setCurrentStep(1);
@@ -454,7 +1005,199 @@ export const Form = () => {
         ) : null}
 
         {currentStep === 2 ? (
-          <>
+          isScheduleEditorOpen ? (
+            <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+              <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeScheduleEditor}
+                  className="px-3 py-1.5 text-xs"
+                >
+                  ← Voltar ao formulário
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleSaveSchedule}
+                  className="px-3 py-1.5 text-xs"
+                >
+                  Salvar horários
+                </Button>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">
+                  Horário de funcionamento (24h)
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Selecione os dias e informe faixas no padrão HH:mm.
+                </p>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {weekDays.map((day) => {
+                  const daySchedule = draftSchedule[day.key];
+                  const dayErrorBadge = getDayErrorBadge(
+                    day.key,
+                    scheduleFieldErrors,
+                  );
+
+                  return (
+                    <div
+                      key={day.key}
+                      className={`rounded-xl border px-3 py-3 transition-colors sm:px-4 ${
+                        daySchedule.ativo
+                          ? "border-emerald-200 bg-white"
+                          : "border-slate-200 bg-white/70"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={daySchedule.ativo}
+                            onChange={(event) =>
+                              handleToggleDay(day.key, event.target.checked)
+                            }
+                            className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
+                          />
+                          <span className="inline-flex min-w-10 items-center justify-center rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
+                            {day.shortLabel}
+                          </span>
+                          <span>{day.label}</span>
+                          {dayErrorBadge.hasError ? (
+                            <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700">
+                              {dayErrorBadge.message}
+                            </span>
+                          ) : null}
+                        </label>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={!daySchedule.ativo}
+                          onClick={() => handleAddRange(day.key)}
+                          className="px-3 py-1.5 text-xs"
+                        >
+                          + Adicionar faixa
+                        </Button>
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        {daySchedule.faixas.map((range, index) => {
+                          const rangeErrorKey = getRangeErrorKey(day.key, index);
+                          const rangeErrors = scheduleFieldErrors[rangeErrorKey];
+
+                          return (
+                            <div
+                              key={`${day.key}-${index}`}
+                              className="grid gap-2 sm:grid-cols-[1fr_auto_1fr_auto] sm:items-center"
+                            >
+                              <div>
+                                <Input
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={5}
+                                  placeholder="HH:mm"
+                                  value={range.inicio}
+                                  disabled={!daySchedule.ativo}
+                                  onChange={(event) =>
+                                    handleRangeChange(
+                                      day.key,
+                                      index,
+                                      "inicio",
+                                      event.target.value,
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    handleRangeBlur(day.key, index, "inicio")
+                                  }
+                                  ref={(element) => {
+                                    scheduleInputRefs.current[
+                                      getRangeInputRefKey(day.key, index, "inicio")
+                                    ] = element;
+                                  }}
+                                  className={`border bg-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
+                                    rangeErrors?.inicio
+                                      ? "border-rose-300 ring-2 ring-rose-100"
+                                      : "border-slate-200"
+                                  }`}
+                                />
+                                {rangeErrors?.inicio && !rangeErrors.row ? (
+                                  <span className="mt-1 block text-xs text-rose-600">
+                                    {rangeErrors.inicio}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <span className="hidden text-center text-sm font-medium text-slate-500 sm:block">
+                                até
+                              </span>
+                              <div>
+                                <Input
+                                  type="text"
+                                  inputMode="numeric"
+                                  maxLength={5}
+                                  placeholder="HH:mm"
+                                  value={range.fim}
+                                  disabled={!daySchedule.ativo}
+                                  onChange={(event) =>
+                                    handleRangeChange(
+                                      day.key,
+                                      index,
+                                      "fim",
+                                      event.target.value,
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    handleRangeBlur(day.key, index, "fim")
+                                  }
+                                  ref={(element) => {
+                                    scheduleInputRefs.current[
+                                      getRangeInputRefKey(day.key, index, "fim")
+                                    ] = element;
+                                  }}
+                                  className={`border bg-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
+                                    rangeErrors?.fim
+                                      ? "border-rose-300 ring-2 ring-rose-100"
+                                      : "border-slate-200"
+                                  }`}
+                                />
+                                {rangeErrors?.fim && !rangeErrors.row ? (
+                                  <span className="mt-1 block text-xs text-rose-600">
+                                    {rangeErrors.fim}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                disabled={!daySchedule.ativo}
+                                onClick={() => handleRemoveRange(day.key, index)}
+                                className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300 ${
+                                  rangeErrors?.row
+                                    ? "border-rose-300 bg-rose-50 text-rose-700"
+                                    : "border-slate-200 text-slate-600"
+                                }`}
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {errors.horario_funcionamento ? (
+                <span className="mt-3 block text-sm text-red-500">
+                  {errors.horario_funcionamento}
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <>
             <label className="space-y-2 md:col-span-2">
               <span className="text-sm font-medium text-slate-700">
                 Categoria *
@@ -552,25 +1295,59 @@ export const Form = () => {
               )}
             </label>
 
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">
-                Horário de funcionamento *
-              </span>
-              <textarea
-                name="horario_funcionamento"
-                value={values.horario_funcionamento}
-                onChange={handleChange}
-                rows={4}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                placeholder='Ex.: {"segunda":"09:00-18:00","sabado":"10:00-14:00"}'
-              />
-              {errors.horario_funcionamento && (
-                <span className="text-sm text-red-500">
+            <div className="space-y-3 md:col-span-2">
+              <div>
+                <span className="text-sm font-medium text-slate-700">
+                  Horário de funcionamento *
+                </span>
+                <p className="mt-1 text-xs text-slate-500">
+                  Formato 24h (HH:mm). Configure os horários em um editor dedicado.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                {getCompactScheduleSummary().length ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Resumo salvo
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {getCompactScheduleSummary().map((item) => (
+                        <span
+                          key={item}
+                          className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    Nenhum horário configurado ainda.
+                  </p>
+                )}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={openScheduleEditor}
+                  className="mt-4 px-3 py-1.5 text-xs"
+                >
+                  {getCompactScheduleSummary().length
+                    ? "Alterar horários"
+                    : "Definir horários"}
+                </Button>
+              </div>
+
+              {errors.horario_funcionamento ? (
+                <span className="block text-sm text-red-500">
                   {errors.horario_funcionamento}
                 </span>
-              )}
-            </label>
+              ) : null}
+            </div>
           </>
+          )
         ) : null}
 
         {currentStep === 3 ? (
@@ -660,7 +1437,7 @@ export const Form = () => {
           ) : (
             <Button
               type="submit"
-              disabled={isSubmitting || !values.aceitou_termos}
+              disabled={isSubmitting}
             >
               {isSubmitting ? "Enviando..." : "Cadastrar estabelecimento"}
             </Button>

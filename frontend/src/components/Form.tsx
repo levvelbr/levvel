@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
+import { getDocumentDigits, maskCnpj } from "../utils/documentMasks";
 
 interface FormValues {
   nome_estabelecimento: string;
@@ -71,47 +72,42 @@ const categoryOptions = [
   "Estética",
 ];
 
-const weekDays: Array<{ key: WeekDayKey; label: string; shortLabel: string }> = [
-  { key: "segunda", label: "Segunda-feira", shortLabel: "Seg" },
-  { key: "terca", label: "Terça-feira", shortLabel: "Ter" },
-  { key: "quarta", label: "Quarta-feira", shortLabel: "Qua" },
-  { key: "quinta", label: "Quinta-feira", shortLabel: "Qui" },
-  { key: "sexta", label: "Sexta-feira", shortLabel: "Sex" },
-  { key: "sabado", label: "Sábado", shortLabel: "Sáb" },
-  { key: "domingo", label: "Domingo", shortLabel: "Dom" },
-];
+const weekDays: Array<{ key: WeekDayKey; label: string; shortLabel: string }> =
+  [
+    { key: "segunda", label: "Segunda-feira", shortLabel: "Seg" },
+    { key: "terca", label: "Terça-feira", shortLabel: "Ter" },
+    { key: "quarta", label: "Quarta-feira", shortLabel: "Qua" },
+    { key: "quinta", label: "Quinta-feira", shortLabel: "Qui" },
+    { key: "sexta", label: "Sexta-feira", shortLabel: "Sex" },
+    { key: "sabado", label: "Sábado", shortLabel: "Sáb" },
+    { key: "domingo", label: "Domingo", shortLabel: "Dom" },
+  ];
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const createEmptyRange = (): TimeRange => ({ inicio: "", fim: "" });
 
 const createInitialSchedule = (): WeeklySchedule =>
-  weekDays.reduce(
-    (acc, day) => {
-      acc[day.key] = {
-        ativo: false,
-        faixas: [createEmptyRange()],
-      };
+  weekDays.reduce((acc, day) => {
+    acc[day.key] = {
+      ativo: false,
+      faixas: [createEmptyRange()],
+    };
 
-      return acc;
-    },
-    {} as WeeklySchedule,
-  );
+    return acc;
+  }, {} as WeeklySchedule);
 
 const cloneSchedule = (schedule: WeeklySchedule): WeeklySchedule =>
-  weekDays.reduce(
-    (acc, day) => {
-      const daySchedule = schedule[day.key];
+  weekDays.reduce((acc, day) => {
+    const daySchedule = schedule[day.key];
 
-      acc[day.key] = {
-        ativo: daySchedule.ativo,
-        faixas: daySchedule.faixas.map((range) => ({ ...range })),
-      };
+    acc[day.key] = {
+      ativo: daySchedule.ativo,
+      faixas: daySchedule.faixas.map((range) => ({ ...range })),
+    };
 
-      return acc;
-    },
-    {} as WeeklySchedule,
-  );
+    return acc;
+  }, {} as WeeklySchedule);
 
 const toMinutes = (value: string) => {
   const [hours, minutes] = value.split(":").map(Number);
@@ -229,7 +225,9 @@ const normalizeTimeOnBlur = (rawValue: string) => {
   return rawValue;
 };
 
-const validateSchedule = (schedule: WeeklySchedule): ScheduleValidationResult => {
+const validateSchedule = (
+  schedule: WeeklySchedule,
+): ScheduleValidationResult => {
   const activeDays = weekDays.filter((day) => schedule[day.key].ativo);
   const fieldErrors: Record<string, RangeFieldError> = {};
 
@@ -271,9 +269,7 @@ const validateSchedule = (schedule: WeeklySchedule): ScheduleValidationResult =>
           inicio: !TIME_PATTERN.test(range.inicio)
             ? "Formato HH:mm."
             : undefined,
-          fim: !TIME_PATTERN.test(range.fim)
-            ? "Formato HH:mm."
-            : undefined,
+          fim: !TIME_PATTERN.test(range.fim) ? "Formato HH:mm." : undefined,
           row: "Corrija para HH:mm.",
         });
 
@@ -449,7 +445,10 @@ export const Form = () => {
     >,
   ) => {
     const { name, value } = event.target;
-    setValues((prev) => ({ ...prev, [name]: value }));
+
+    const nextValue = name === "cnpj" ? maskCnpj(value) : value;
+
+    setValues((prev) => ({ ...prev, [name]: nextValue }));
     setErrors((prev) => {
       const nextErrors = { ...prev };
       delete nextErrors[name as keyof FormValues];
@@ -636,9 +635,8 @@ export const Form = () => {
         const dayRanges = draftSchedule[day.key].faixas;
 
         for (let index = 0; index < dayRanges.length; index += 1) {
-          const fieldError = validation.fieldErrors[
-            getRangeErrorKey(day.key, index)
-          ];
+          const fieldError =
+            validation.fieldErrors[getRangeErrorKey(day.key, index)];
 
           if (!fieldError) {
             continue;
@@ -739,7 +737,8 @@ export const Form = () => {
         newErrors.confirmar_senha = "As senhas não conferem";
       }
       if (!formValues.aceitou_termos) {
-        newErrors.aceitou_termos = "Voce precisa aceitar os termos para continuar";
+        newErrors.aceitou_termos =
+          "Voce precisa aceitar os termos para continuar";
       }
     }
 
@@ -781,7 +780,7 @@ export const Form = () => {
       email: values.email.trim(),
       localizacao: values.localizacao.trim(),
       foto_estabelecimento_url: null,
-      cnpj: values.cnpj.trim() || null,
+      cnpj: getDocumentDigits(values.cnpj, 14) || null,
       razao_social: values.razao_social.trim() || null,
       categoria: values.categoria,
       instagram: values.instagram.trim() || null,
@@ -936,9 +935,7 @@ export const Form = () => {
                 onChange={handleChange}
                 placeholder="(00) 00000-0000"
               />
-              {errors.telefone && (
-                <ErrorBadge message={errors.telefone} />
-              )}
+              {errors.telefone && <ErrorBadge message={errors.telefone} />}
             </label>
 
             <label className="space-y-2">
@@ -952,9 +949,7 @@ export const Form = () => {
                 onChange={handleChange}
                 placeholder="user@example.com"
               />
-              {errors.email && (
-                <ErrorBadge message={errors.email} />
-              )}
+              {errors.email && <ErrorBadge message={errors.email} />}
             </label>
 
             <label className="space-y-2">
@@ -980,9 +975,7 @@ export const Form = () => {
                 onChange={handleChange}
                 placeholder="00.000.000/0000-00"
               />
-              {errors.cnpj && (
-                <ErrorBadge message={errors.cnpj} />
-              )}
+              {errors.cnpj && <ErrorBadge message={errors.cnpj} />}
             </label>
 
             <label className="space-y-2 md:col-span-2">
@@ -1084,8 +1077,12 @@ export const Form = () => {
 
                       <div className="mt-3 space-y-2">
                         {daySchedule.faixas.map((range, index) => {
-                          const rangeErrorKey = getRangeErrorKey(day.key, index);
-                          const rangeErrors = scheduleFieldErrors[rangeErrorKey];
+                          const rangeErrorKey = getRangeErrorKey(
+                            day.key,
+                            index,
+                          );
+                          const rangeErrors =
+                            scheduleFieldErrors[rangeErrorKey];
 
                           return (
                             <div
@@ -1113,7 +1110,11 @@ export const Form = () => {
                                   }
                                   ref={(element) => {
                                     scheduleInputRefs.current[
-                                      getRangeInputRefKey(day.key, index, "inicio")
+                                      getRangeInputRefKey(
+                                        day.key,
+                                        index,
+                                        "inicio",
+                                      )
                                     ] = element;
                                   }}
                                   className={`border bg-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
@@ -1166,7 +1167,9 @@ export const Form = () => {
                               <button
                                 type="button"
                                 disabled={!daySchedule.ativo}
-                                onClick={() => handleRemoveRange(day.key, index)}
+                                onClick={() =>
+                                  handleRemoveRange(day.key, index)
+                                }
                                 className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300 ${
                                   rangeErrors?.row
                                     ? "border-rose-300 bg-rose-50 text-rose-700"
@@ -1190,151 +1193,148 @@ export const Form = () => {
             </div>
           ) : (
             <>
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">
-                Categoria *
-              </span>
-              <select
-                name="categoria"
-                value={values.categoria}
-                onChange={handleChange}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-              >
-                {categoryOptions.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-              {errors.categoria && (
-                <ErrorBadge message={errors.categoria} />
-              )}
-            </label>
-
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">
-                Instagram *
-              </span>
-              <Input
-                name="instagram"
-                value={values.instagram}
-                onChange={handleChange}
-                placeholder="@seu_instagram"
-              />
-              {errors.instagram && (
-                <ErrorBadge message={errors.instagram} />
-              )}
-            </label>
-
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">
-                Serviços oferecidos
-              </span>
-              <textarea
-                name="servicos_oferecidos"
-                value={values.servicos_oferecidos}
-                onChange={handleChange}
-                rows={3}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                placeholder="Digite separados por vírgula, ex: corte, color, hidratação"
-              />
-            </label>
-
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">
-                Técnicas utilizadas
-              </span>
-              <textarea
-                name="tecnicas_utilizadas"
-                value={values.tecnicas_utilizadas}
-                onChange={handleChange}
-                rows={3}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                placeholder="Digite separados por vírgula"
-              />
-            </label>
-
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">
-                Produtos aplicados
-              </span>
-              <textarea
-                name="produtos_aplicados"
-                value={values.produtos_aplicados}
-                onChange={handleChange}
-                rows={3}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                placeholder="Digite separados por vírgula"
-              />
-            </label>
-
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">
-                Profissionais envolvidos *
-              </span>
-              <textarea
-                name="profissionais_envolvidos"
-                value={values.profissionais_envolvidos}
-                onChange={handleChange}
-                rows={3}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                placeholder="Digite separados por vírgula"
-              />
-              {errors.profissionais_envolvidos && (
-                <ErrorBadge message={errors.profissionais_envolvidos} />
-              )}
-            </label>
-
-            <div className="space-y-3 md:col-span-2">
-              <div>
+              <label className="space-y-2 md:col-span-2">
                 <span className="text-sm font-medium text-slate-700">
-                  Horário de funcionamento *
+                  Categoria *
                 </span>
-                <p className="mt-1 text-xs text-slate-500">
-                  Formato 24h (HH:mm). Configure os horários em um editor dedicado.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                {getCompactScheduleSummary().length ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Resumo salvo
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {getCompactScheduleSummary().map((item) => (
-                        <span
-                          key={item}
-                          className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-500">
-                    Nenhum horário configurado ainda.
-                  </p>
-                )}
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={openScheduleEditor}
-                  className="mt-4 px-3 py-1.5 text-xs"
+                <select
+                  name="categoria"
+                  value={values.categoria}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 >
-                  {getCompactScheduleSummary().length
-                    ? "Alterar horários"
-                    : "Definir horários"}
-                </Button>
-              </div>
+                  {categoryOptions.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+                {errors.categoria && <ErrorBadge message={errors.categoria} />}
+              </label>
 
-              {errors.horario_funcionamento ? (
-                <ErrorBadge message={errors.horario_funcionamento} />
-              ) : null}
-            </div>
-          </>
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Instagram *
+                </span>
+                <Input
+                  name="instagram"
+                  value={values.instagram}
+                  onChange={handleChange}
+                  placeholder="@seu_instagram"
+                />
+                {errors.instagram && <ErrorBadge message={errors.instagram} />}
+              </label>
+
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Serviços oferecidos
+                </span>
+                <textarea
+                  name="servicos_oferecidos"
+                  value={values.servicos_oferecidos}
+                  onChange={handleChange}
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  placeholder="Digite separados por vírgula, ex: corte, color, hidratação"
+                />
+              </label>
+
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Técnicas utilizadas
+                </span>
+                <textarea
+                  name="tecnicas_utilizadas"
+                  value={values.tecnicas_utilizadas}
+                  onChange={handleChange}
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  placeholder="Digite separados por vírgula"
+                />
+              </label>
+
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Produtos aplicados
+                </span>
+                <textarea
+                  name="produtos_aplicados"
+                  value={values.produtos_aplicados}
+                  onChange={handleChange}
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  placeholder="Digite separados por vírgula"
+                />
+              </label>
+
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Profissionais envolvidos *
+                </span>
+                <textarea
+                  name="profissionais_envolvidos"
+                  value={values.profissionais_envolvidos}
+                  onChange={handleChange}
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  placeholder="Digite separados por vírgula"
+                />
+                {errors.profissionais_envolvidos && (
+                  <ErrorBadge message={errors.profissionais_envolvidos} />
+                )}
+              </label>
+
+              <div className="space-y-3 md:col-span-2">
+                <div>
+                  <span className="text-sm font-medium text-slate-700">
+                    Horário de funcionamento *
+                  </span>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Formato 24h (HH:mm). Configure os horários em um editor
+                    dedicado.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  {getCompactScheduleSummary().length ? (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Resumo salvo
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {getCompactScheduleSummary().map((item) => (
+                          <span
+                            key={item}
+                            className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      Nenhum horário configurado ainda.
+                    </p>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={openScheduleEditor}
+                    className="mt-4 px-3 py-1.5 text-xs"
+                  >
+                    {getCompactScheduleSummary().length
+                      ? "Alterar horários"
+                      : "Definir horários"}
+                  </Button>
+                </div>
+
+                {errors.horario_funcionamento ? (
+                  <ErrorBadge message={errors.horario_funcionamento} />
+                ) : null}
+              </div>
+            </>
           )
         ) : null}
 
@@ -1351,9 +1351,7 @@ export const Form = () => {
                 onChange={handleChange}
                 placeholder="Senha do estabelecimento"
               />
-              {errors.senha_hash && (
-                <ErrorBadge message={errors.senha_hash} />
-              )}
+              {errors.senha_hash && <ErrorBadge message={errors.senha_hash} />}
             </label>
 
             <label className="space-y-2 md:col-span-2">
@@ -1417,10 +1415,7 @@ export const Form = () => {
               Próximo
             </Button>
           ) : (
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-            >
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Enviando..." : "Cadastrar estabelecimento"}
             </Button>
           )}

@@ -4,6 +4,7 @@ import Button from "./Button";
 import api from "../services/api";
 import type { UserSession } from "../types/auth";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { maskCpf } from "../utils/documentMasks";
 
 interface ClientFormValues {
   nome_usuario: string;
@@ -124,11 +125,18 @@ export const ClientForm = ({
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name } = event.target;
-    const nextValue =
+    let nextValue: string | boolean;
+
+    if (
       event.target instanceof HTMLInputElement &&
       event.target.type === "checkbox"
-        ? event.target.checked
-        : event.target.value;
+    ) {
+      nextValue = event.target.checked;
+    } else if (name === "cpf") {
+      nextValue = maskCpf(event.target.value);
+    } else {
+      nextValue = event.target.value;
+    }
 
     setValues((prev) => ({ ...prev, [name]: nextValue }));
     setErrors((prev) => {
@@ -428,7 +436,7 @@ export const ClientForm = ({
                     name="cpf"
                     value={values.cpf}
                     onChange={handleChange}
-                    placeholder="00000000000"
+                    placeholder="000.000.000-00"
                   />
                   {errors.cpf ? (
                     <span className="text-sm text-red-500">{errors.cpf}</span>

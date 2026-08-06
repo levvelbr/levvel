@@ -4,6 +4,7 @@ import Button from "./Button";
 import api from "../services/api";
 import type { UserSession } from "../types/auth";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { getDocumentDigits, maskCpfOrCnpj } from "../utils/documentMasks";
 
 interface LoginFormValues {
   identificador: string;
@@ -40,7 +41,13 @@ export const LoginForm = ({
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
-    setValues((prev) => ({ ...prev, [name]: value }));
+
+    const shouldMaskDocument =
+      name === "identificador" && !/[A-Za-z@]/.test(value);
+
+    const nextValue = shouldMaskDocument ? maskCpfOrCnpj(value) : value;
+
+    setValues((prev) => ({ ...prev, [name]: nextValue }));
     setError(null);
   };
 
@@ -49,7 +56,7 @@ export const LoginForm = ({
     setError(null);
 
     if (!values.identificador.trim() || !values.senha.trim()) {
-      setError("Preencha e-mail ou CPF e senha para continuar.");
+      setError("Preencha e-mail ou CPF/CNPJ e senha para continuar.");
       return;
     }
 
@@ -60,10 +67,10 @@ export const LoginForm = ({
       const isEmailIdentifier = rawIdentifier.includes("@");
       const normalizedIdentifier = isEmailIdentifier
         ? rawIdentifier.toLowerCase()
-        : rawIdentifier.replace(/\D/g, "");
+        : getDocumentDigits(rawIdentifier, 14);
 
       if (!normalizedIdentifier) {
-        setError("Informe um e-mail ou CPF válido.");
+        setError("Informe um e-mail, CPF ou CNPJ válido.");
         setIsSubmitting(false);
         return;
       }

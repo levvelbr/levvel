@@ -104,17 +104,14 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
           )}
 
           {session?.role !== "estabelecimento" ? (
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                navigate("/#services");
-              }}
+            <Link
+              to="/servicos"
+              onClick={onClose}
               className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
             >
               <Scissors className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
               Serviços
-            </button>
+            </Link>
           ) : null}
         </nav>
       </aside>

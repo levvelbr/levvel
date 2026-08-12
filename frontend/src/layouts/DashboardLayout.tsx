@@ -24,6 +24,7 @@ import { getCategoryIcon } from "../utils/categoryIcons";
 
 interface LayoutProps {
   children?: ReactNode;
+  variant?: "home" | "services";
 }
 
 interface Establishment {
@@ -113,11 +114,15 @@ const formatBookingDate = (iso: string) => {
   });
 };
 
-export const DashboardLayout = ({ children }: LayoutProps) => {
+export const DashboardLayout = ({
+  children,
+  variant = "home",
+}: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { session, isAuthenticated, login, logout, updateSession } = useAuth();
   const isProviderView = isAuthenticated && session?.role === "estabelecimento";
+  const isServicesPage = variant === "services";
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -137,7 +142,7 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
   const [providerStatusUpdating, setProviderStatusUpdating] = useState<
     string | null
   >(null);
-  const heroSearchRef = useRef<HTMLDivElement | null>(null);
+  const fixedSearchRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (isProviderView) {
@@ -240,7 +245,7 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
 
   useEffect(() => {
     const handleScroll = () => {
-      const searchElement = heroSearchRef.current;
+      const searchElement = fixedSearchRef.current;
 
       if (!searchElement) {
         setShowHeaderSearch(false);
@@ -256,14 +261,6 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
 
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  const handleScrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
-
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
 
   const handleProviderBookingStatusUpdate = async (
     bookingId: string,
@@ -432,6 +429,8 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
         showSearchBar={showHeaderSearch}
         searchQuery={searchQuery}
         onSearch={setSearchQuery}
+        hideMobileSearchToggle={isServicesPage}
+        compactUserProfile={isServicesPage && showHeaderSearch}
       />
 
       <AuthModal
@@ -654,6 +653,76 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
               </div>
             </div>
           </section>
+        ) : isServicesPage ? (
+          <section className="bg-linear-to-b from-emerald-50 via-slate-50 to-white px-4 py-10 sm:py-14">
+            <div className="mx-auto w-full max-w-6xl">
+              <div className="mb-8 grid gap-6 border-b border-emerald-100 pb-8 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:items-end">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-700">
+                    Catálogo de serviços
+                  </p>
+                  <h1 className="mt-2 text-3xl font-semibold text-emerald-950 sm:text-4xl">
+                    Encontre o atendimento ideal
+                  </h1>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+                    Pesquise por serviço, estabelecimento, categoria ou
+                    localização e compare os profissionais disponíveis.
+                  </p>
+                </div>
+
+                <div ref={fixedSearchRef}>
+                  <SearchBar
+                    value={searchQuery}
+                    onSearch={setSearchQuery}
+                    autoFocusInput
+                  />
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h2
+                    id="categories-title"
+                    className="text-base font-semibold text-slate-900"
+                  >
+                    Filtrar por categoria
+                  </h2>
+                  {activeCategory ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveCategory(null)}
+                      className="text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+                    >
+                      Limpar filtro
+                    </button>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {serviceCategories.map((category) => {
+                    const isActive = activeCategory === category.name;
+
+                    return (
+                      <button
+                        key={category.name}
+                        type="button"
+                        onClick={() => toggleCategory(category.name)}
+                        className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${
+                          isActive
+                            ? "border-emerald-600 bg-emerald-700 text-white"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+                        }`}
+                      >
+                        <category.icon className="h-4 w-4" strokeWidth={2} />
+                        {category.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid w-full gap-8">{content}</div>
+            </div>
+          </section>
         ) : (
           <>
             <section className="bg-linear-to-b from-gray-100 to-white pt-20 pb-10">
@@ -675,7 +744,7 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
                 <div className="flex items-center justify-center gap-4">
                   <button
                     type="button"
-                    onClick={() => handleScrollToSection("services")}
+                    onClick={() => navigate("/servicos")}
                     className="bg-emerald-700 text-white rounded-md px-6 py-3 hover:bg-emerald-800 cursor-pointer"
                   >
                     Explorar Serviços
@@ -690,7 +759,7 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
                 </div>
 
                 <div
-                  ref={heroSearchRef}
+                  ref={fixedSearchRef}
                   className="mx-auto mt-8 max-w-5xl hidden md:block"
                 >
                   <SearchBar value={searchQuery} onSearch={setSearchQuery} />

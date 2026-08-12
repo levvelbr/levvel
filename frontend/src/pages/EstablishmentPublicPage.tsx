@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   AtSign,
@@ -50,6 +50,7 @@ const formatList = (values: string[]) => {
 export const EstablishmentPublicPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, session, login, logout } = useAuth();
   const [establishment, setEstablishment] = useState<Establishment | null>(
     null,
@@ -59,6 +60,8 @@ export const EstablishmentPublicPage = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const returnTo =
+    (location.state as { returnTo?: string } | null)?.returnTo ?? "/";
 
   useEffect(() => {
     const fetchEstablishment = async () => {
@@ -182,7 +185,7 @@ export const EstablishmentPublicPage = () => {
               {error ?? "Estabelecimento nao encontrado."}
             </p>
             <Link
-              to="/"
+              to={returnTo}
               className="mt-4 inline-flex rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
             >
               Voltar para a home
@@ -232,7 +235,7 @@ export const EstablishmentPublicPage = () => {
         <div className="mx-auto max-w-6xl">
           <div className="establishment-mount mb-4">
             <Link
-              to="/"
+              to={returnTo}
               className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
             >
               <ArrowLeft className="h-4 w-4" strokeWidth={2} />

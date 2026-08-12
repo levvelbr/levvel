@@ -85,7 +85,11 @@ export const EstablishmentList = ({
 
     const matchesSearch = normalizedSearch
       ? normalizeText(item.nome_estabelecimento).includes(normalizedSearch) ||
-        normalizeText(item.categoria).includes(normalizedSearch)
+        normalizeText(item.categoria).includes(normalizedSearch) ||
+        normalizeText(item.localizacao).includes(normalizedSearch) ||
+        item.servicos_oferecidos?.some((service) =>
+          normalizeText(service).includes(normalizedSearch),
+        )
       : true;
 
     return matchesCategoryFilter && matchesSearch;

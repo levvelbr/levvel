@@ -1,5 +1,5 @@
 import CategoryIcon from "./CategoryIcon";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import type { BookingEstablishment } from "./BookingForm";
 
@@ -31,6 +31,7 @@ export const EstablishmentCard = ({
   onRequestBooking,
 }: EstablishmentCardProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, session } = useAuth();
   const services = servicos_oferecidos.length
     ? servicos_oferecidos
@@ -38,7 +39,11 @@ export const EstablishmentCard = ({
   const servicesLine = services.join(", ");
 
   const handleOpenDetails = () => {
-    navigate(`/estabelecimentos/${encodeURIComponent(id)}`);
+    navigate(`/estabelecimentos/${encodeURIComponent(id)}`, {
+      state: {
+        returnTo: `${location.pathname}${location.search}${location.hash}`,
+      },
+    });
   };
 
   return (

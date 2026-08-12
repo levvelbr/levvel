@@ -3,6 +3,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { EstablishmentPublicPage } from "./pages/EstablishmentPublicPage";
 import { HomePage } from "./pages/HomePage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { ServicesPage } from "./pages/ServicesPage";
 import { TermsPrivacyPage } from "./pages/TermsPrivacyPage";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
@@ -13,6 +14,7 @@ export const App = () => {
       <AuthProvider>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/servicos" element={<ServicesPage />} />
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route
             path="/estabelecimentos/:id"

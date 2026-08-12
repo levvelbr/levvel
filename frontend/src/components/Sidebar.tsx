@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Calendar,
   Home,
@@ -19,6 +19,7 @@ interface SidebarProps {
 
 export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, session, logout } = useAuth();
 
   const bookingsLabel =
@@ -29,6 +30,17 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
     onClose();
     navigate("/");
   };
+
+  const getNavigationClassName = (isActive: boolean) =>
+    `flex items-center gap-3 rounded-md px-4 py-2 transition-colors ${
+      isActive
+        ? "bg-slate-50 text-slate-700 font-semibold"
+        : "text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+    }`;
+
+  const isBookingsPage =
+    location.pathname === "/perfil" &&
+    new URLSearchParams(location.search).get("tab") === "bookings";
 
   return (
     <>
@@ -57,12 +69,34 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
         </div>
 
         <nav className="flex flex-col gap-2 p-4">
+          {!isAuthenticated ? (
+            <button
+              type="button"
+              className="group flex w-full items-center gap-3 rounded-md  px-4 py-2 text-left cursor-pointer font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 focus:bg-emerald-100"
+              onClick={() => {
+                onClose();
+                onOpenLogin();
+              }}
+            >
+              <LogIn
+                className="h-5 w-5 text-emerald-700 group-hover:text-emerald-800"
+                strokeWidth={1.5}
+              />
+              Login
+            </button>
+          ) : null}
+
           <Link
             to="/"
             onClick={onClose}
-            className="flex items-center gap-3 rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+            className={getNavigationClassName(location.pathname === "/")}
           >
-            <Home className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
+            <Home
+              className={`h-5 w-5 ${
+                location.pathname === "/" ? "text-slate-700 " : "text-slate-500"
+              }`}
+              strokeWidth={`${location.pathname === "/" ? 2 : 1.5}`}
+            />
             Home
           </Link>
 
@@ -71,68 +105,82 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
               <Link
                 to="/perfil"
                 onClick={onClose}
-                className="flex items-center gap-3 rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+                className={getNavigationClassName(
+                  location.pathname === "/perfil" && !isBookingsPage,
+                )}
               >
-                <User className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
+                <User
+                  className={`h-5 w-5 ${
+                    location.pathname === "/perfil"
+                      ? "text-slate-700 "
+                      : "text-slate-500"
+                  }`}
+                  strokeWidth={`${location.pathname === "/perfil" ? 2 : 1.5}`}
+                />
                 Meu perfil
               </Link>
 
               <Link
                 to="/perfil?tab=bookings"
                 onClick={onClose}
-                className="flex items-center gap-3 rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+                className={getNavigationClassName(isBookingsPage)}
               >
                 <Calendar
-                  className="h-5 w-5 text-slate-500"
-                  strokeWidth={1.5}
+                  className={`h-5 w-5 ${
+                    isBookingsPage ? "text-slate-700 " : "text-slate-500"
+                  }`}
+                  strokeWidth={`${location.pathname === "/" ? 2 : 1.5}`}
                 />
                 {bookingsLabel}
               </Link>
-
-              <button
-                type="button"
-                className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
-                onClick={handleLogout}
-              >
-                <LogOut className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
-                Sair
-              </button>
             </>
-          ) : (
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
-              onClick={() => {
-                onClose();
-                onOpenLogin();
-              }}
-            >
-              <LogIn className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
-              Login
-            </button>
-          )}
+          ) : null}
 
           {session?.role !== "estabelecimento" ? (
             <Link
               to="/servicos"
               onClick={onClose}
-              className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+              className={getNavigationClassName(
+                location.pathname === "/servicos",
+              )}
             >
-              <Scissors className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
+              <Scissors
+                className={`h-5 w-5 ${
+                  location.pathname === "/servicos"
+                    ? "text-slate-700 "
+                    : "text-slate-500"
+                }`}
+                strokeWidth={`${location.pathname === "/servicos" ? 2 : 1.5}`}
+              />
               Serviços
             </Link>
           ) : null}
           <Link
             to="/contato"
             onClick={onClose}
-            className="flex items-center gap-3 rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+            className={getNavigationClassName(location.pathname === "/contato")}
           >
             <MessageCircle
-              className="h-5 w-5 text-slate-500"
-              strokeWidth={1.5}
+              className={`h-5 w-5 ${
+                location.pathname === "/contato"
+                  ? "text-slate-700 "
+                  : "text-slate-500"
+              }`}
+              strokeWidth={`${location.pathname === "/contato" ? 2 : 1.5}`}
             />
             Contato
           </Link>
+
+          {isAuthenticated ? (
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
+              Sair
+            </button>
+          ) : null}
         </nav>
       </aside>
     </>

@@ -1,5 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Calendar, Home, LogIn, LogOut, Scissors, User, X } from "lucide-react";
+import {
+  Calendar,
+  Home,
+  LogIn,
+  LogOut,
+  MessageCircle,
+  Scissors,
+  User,
+  X,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 interface SidebarProps {
@@ -113,6 +122,17 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
               Serviços
             </Link>
           ) : null}
+          <Link
+            to="/contato"
+            onClick={onClose}
+            className="flex items-center gap-3 rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+          >
+            <MessageCircle
+              className="h-5 w-5 text-slate-500"
+              strokeWidth={1.5}
+            />
+            Contato
+          </Link>
         </nav>
       </aside>
     </>

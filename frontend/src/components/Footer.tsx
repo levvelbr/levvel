@@ -1,4 +1,5 @@
 import { Mail, Phone } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export const Footer = () => {
   return (
@@ -20,6 +21,12 @@ export const Footer = () => {
             <Phone className="h-4 w-4" strokeWidth={1.8} />
             (55) 9 9999-9999
           </a>
+          <Link
+            to="/contato"
+            className="font-semibold text-emerald-700 hover:text-emerald-800"
+          >
+            Página de contato
+          </Link>
         </address>
       </div>
     </footer>

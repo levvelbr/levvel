@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BookingForm, type BookingEstablishment } from "./BookingForm";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { useEscapeKey } from "../hooks/useEscapeKey";
 
 export type { BookingEstablishment };
 
@@ -24,6 +25,7 @@ export const BookingModal = ({
   const [isModalClosing, setIsModalClosing] = useState(false);
 
   useBodyScrollLock(isRendered);
+  useEscapeKey(isRendered && !isModalClosing, onClose);
 
   useEffect(() => {
     if (isOpen && establishment) {

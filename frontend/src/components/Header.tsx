@@ -36,7 +36,9 @@ const UserAvatar = ({ name, photoUrl, compact = false }: UserAvatarProps) => {
 
   if (photoUrl && hasPhoto) {
     return (
-      <span className={`relative flex ${avatarSize} shrink-0 items-center justify-center overflow-hidden rounded-full border border-emerald-100 bg-emerald-100 text-xs font-bold text-emerald-900`}>
+      <span
+        className={`relative flex ${avatarSize} shrink-0 items-center justify-center overflow-hidden rounded-full border border-emerald-100 bg-emerald-100 text-xs font-bold text-emerald-900`}
+      >
         <span
           className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
             isLoading ? "opacity-100" : "opacity-0"
@@ -68,7 +70,9 @@ const UserAvatar = ({ name, photoUrl, compact = false }: UserAvatarProps) => {
   }
 
   return (
-    <span className={`flex ${avatarSize} items-center justify-center rounded-full bg-emerald-200 text-xs font-bold text-emerald-900`}>
+    <span
+      className={`flex ${avatarSize} items-center justify-center rounded-full bg-emerald-200 text-xs font-bold text-emerald-900`}
+    >
       {initial}
     </span>
   );
@@ -313,7 +317,6 @@ export const Header = ({
               </button>
             </>
           )}
-
         </div>
 
         <div className="hidden md:grid md:w-full md:grid-cols-[auto_1fr_auto] md:items-center md:gap-4">

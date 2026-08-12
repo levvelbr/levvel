@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { useEscapeKey } from "../hooks/useEscapeKey";
 import { Form } from "./Form";
 
 const MODAL_EXIT_DURATION_MS = 220;
@@ -20,6 +21,7 @@ export const EstablishmentModal = ({
   const [isClosing, setIsClosing] = useState(false);
 
   useBodyScrollLock(isRendered);
+  useEscapeKey(isRendered && !isClosing, onClose);
 
   useEffect(() => {
     if (isOpen) {

@@ -3,6 +3,7 @@ import { ClientForm } from "./ClientForm";
 import { LoginForm } from "./LoginForm";
 import type { UserSession } from "../types/auth";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { useEscapeKey } from "../hooks/useEscapeKey";
 
 const MODAL_EXIT_DURATION_MS = 220;
 const FORM_SWITCH_DURATION_MS = 230;
@@ -25,6 +26,7 @@ export const AuthModal = ({
   const [activeForm, setActiveForm] = useState<"login" | "register">("login");
 
   useBodyScrollLock(isRendered);
+  useEscapeKey(isRendered && !isModalClosing, onClose);
 
   useEffect(() => {
     if (isOpen) {

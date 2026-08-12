@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Check, Home, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { AuthModal } from "../components/AuthModal";
 import { Header } from "../components/Header";
@@ -409,20 +410,7 @@ export const ProfilePage = () => {
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
               aria-label="Voltar para a home"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.8}
-                stroke="currentColor"
-                className="h-5 w-5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75V19.5A2.25 2.25 0 0 0 6.75 21.75h3.75v-6a.75.75 0 0 1 .75-.75h2.25a.75.75 0 0 1 .75.75v6h3.75a2.25 2.25 0 0 0 2.25-2.25V9.75"
-                />
-              </svg>
+              <Home className="h-5 w-5" strokeWidth={1.8} />
             </Link>
 
             <div className="flex w-fit gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
@@ -915,8 +903,9 @@ export const ProfilePage = () => {
                               onClick={() =>
                                 handleStatusUpdate(ag.id, "confirmado")
                               }
-                              className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                              className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
                             >
+                              <Check className="h-3.5 w-3.5" strokeWidth={2} />
                               Confirmar
                             </button>
                             <button
@@ -925,8 +914,9 @@ export const ProfilePage = () => {
                               onClick={() =>
                                 handleStatusUpdate(ag.id, "recusado")
                               }
-                              className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                              className="flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
                             >
+                              <X className="h-3.5 w-3.5" strokeWidth={2} />
                               Recusar
                             </button>
                           </>

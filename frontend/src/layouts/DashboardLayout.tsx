@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Check, Play, X, type LucideIcon } from "lucide-react";
 import { AuthModal } from "../components/AuthModal";
 import { useAuth } from "../contexts/AuthContext";
 import { Header } from "../components/Header";
@@ -19,6 +20,7 @@ import { BookingModal } from "../components/BookingModal";
 import type { BookingEstablishment } from "../components/BookingForm";
 import SearchBar from "../components/SearchBar";
 import api from "../services/api";
+import { getCategoryIcon } from "../utils/categoryIcons";
 
 interface LayoutProps {
   children?: ReactNode;
@@ -32,7 +34,7 @@ interface Establishment {
 
 interface CategoryMeta {
   name: string;
-  icon: string;
+  icon: LucideIcon;
   color: string;
 }
 
@@ -338,23 +340,20 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
       ),
     ).sort((a, b) => a.localeCompare(b));
 
-    const categoryStyles: Record<string, CategoryMeta> = {
-      Beleza: { name: "Beleza", icon: "✂", color: "from-pink-500 to-rose-500" },
+    const categoryStyles: Record<string, Omit<CategoryMeta, "icon">> = {
+      Beleza: { name: "Beleza", color: "from-pink-500 to-rose-500" },
       "Bem-estar": {
         name: "Bem-estar",
-        icon: "🧘",
         color: "from-emerald-500 to-teal-500",
       },
-      Saúde: { name: "Saúde", icon: "🩺", color: "from-sky-500 to-cyan-500" },
+      Saúde: { name: "Saúde", color: "from-sky-500 to-cyan-500" },
       Massagens: {
         name: "Massagens",
-        icon: "💆‍♀️",
         color: "from-amber-500 to-orange-500",
       },
-      Pets: { name: "Pets", icon: "🐶", color: "from-lime-500 to-green-500" },
+      Pets: { name: "Pets", color: "from-lime-500 to-green-500" },
       Moda: {
         name: "Moda",
-        icon: "👗",
         color: "from-violet-500 to-fuchsia-500",
       },
     };
@@ -362,12 +361,12 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
     return categories.map((category) => {
       const fallback = {
         name: category,
-        icon: "🧴",
         color: "from-slate-500 to-slate-600",
       };
 
       return {
         ...(categoryStyles[category] ?? fallback),
+        icon: getCategoryIcon(category),
       };
     });
   }, [establishments]);
@@ -592,8 +591,9 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
                                       "recusado",
                                     )
                                   }
-                                  className="rounded-md border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                                  className="flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
                                 >
+                                  <X className="h-3.5 w-3.5" strokeWidth={2} />
                                   Recusar
                                 </button>
                                 <button
@@ -607,11 +607,30 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
                                       "confirmado",
                                     )
                                   }
-                                  className="rounded-md bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                                  className="flex items-center gap-1 rounded-md bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
                                 >
+                                  <Check
+                                    className="h-3.5 w-3.5"
+                                    strokeWidth={2}
+                                  />
                                   Confirmar
                                 </button>
                               </div>
+                            ) : booking.status === "confirmado" ? (
+                              <button
+                                type="button"
+                                disabled={providerStatusUpdating === booking.id}
+                                onClick={() =>
+                                  handleProviderBookingStatusUpdate(
+                                    booking.id,
+                                    "em_andamento",
+                                  )
+                                }
+                                className="flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+                              >
+                                <Play className="h-3.5 w-3.5" strokeWidth={2} />
+                                Iniciar atendimento
+                              </button>
                             ) : booking.status === "em_andamento" ? (
                               <button
                                 type="button"
@@ -704,9 +723,12 @@ export const DashboardLayout = ({ children }: LayoutProps) => {
                             }`}
                           >
                             <div
-                              className={`flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-br ${category.color} text-sm text-white shadow-sm`}
+                              className={`flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-br ${category.color} text-white shadow-sm`}
                             >
-                              {category.icon}
+                              <category.icon
+                                className="h-4 w-4"
+                                strokeWidth={2}
+                              />
                             </div>
                             <p
                               className={`mt-2 text-[11px] font-semibold leading-tight truncate ${

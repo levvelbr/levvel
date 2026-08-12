@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { Calendar, Home, LogIn, LogOut, Scissors, User, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 interface SidebarProps {
@@ -42,20 +43,7 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
             className="p-1 text-slate-500 hover:bg-slate-100 rounded-md cursor-pointer"
             aria-label="Fechar menu"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <X className="w-6 h-6" strokeWidth={1.5} />
           </button>
         </div>
 
@@ -63,8 +51,9 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
           <Link
             to="/"
             onClick={onClose}
-            className="block rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+            className="flex items-center gap-3 rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
           >
+            <Home className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
             Home
           </Link>
 
@@ -73,50 +62,60 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
               <Link
                 to="/perfil"
                 onClick={onClose}
-                className="block rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+                className="flex items-center gap-3 rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
               >
+                <User className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
                 Meu perfil
               </Link>
 
               <Link
                 to="/perfil?tab=bookings"
                 onClick={onClose}
-                className="block rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+                className="flex items-center gap-3 rounded-md px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
               >
+                <Calendar
+                  className="h-5 w-5 text-slate-500"
+                  strokeWidth={1.5}
+                />
                 {bookingsLabel}
               </Link>
 
               <button
                 type="button"
-                className="block w-full rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+                className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
                 onClick={handleLogout}
               >
+                <LogOut className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
                 Sair
               </button>
             </>
           ) : (
             <button
               type="button"
-              className="block w-full rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+              className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
               onClick={() => {
                 onClose();
                 onOpenLogin();
               }}
             >
+              <LogIn className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
               Login
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              navigate("/#services");
-            }}
-            className="block w-full rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
-          >
-            Serviços
-          </button>
+          {session?.role !== "estabelecimento" ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate("/#services");
+              }}
+              className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-left font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
+            >
+              <Scissors className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
+              Serviços
+            </button>
+          ) : null}
         </nav>
       </aside>
     </>

@@ -1,4 +1,5 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { ArrowLeft } from "lucide-react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
@@ -1005,7 +1006,8 @@ export const Form = () => {
                   onClick={closeScheduleEditor}
                   className="px-3 py-1.5 text-xs"
                 >
-                  ← Voltar ao formulário
+                  <ArrowLeft className="mr-1 h-3.5 w-3.5" strokeWidth={2} />
+                  Voltar ao formulário
                 </Button>
 
                 <Button

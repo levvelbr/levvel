@@ -1,5 +1,6 @@
-import { useState, type HTMLAttributes } from "react";
+import { useEffect, useState, type HTMLAttributes } from "react";
 import { Link } from "react-router-dom";
+import { ChevronDown, LoaderCircle, Menu, Search, X } from "lucide-react";
 import SearchBar from "./SearchBar";
 
 interface HeaderProps extends HTMLAttributes<HTMLElement> {
@@ -21,14 +22,44 @@ interface UserAvatarProps {
 const UserAvatar = ({ name, photoUrl }: UserAvatarProps) => {
   const normalizedName = name.trim();
   const initial = normalizedName ? normalizedName.charAt(0).toUpperCase() : "?";
+  const [isLoading, setIsLoading] = useState(Boolean(photoUrl));
+  const [hasPhoto, setHasPhoto] = useState(Boolean(photoUrl));
 
-  if (photoUrl) {
+  useEffect(() => {
+    setIsLoading(Boolean(photoUrl));
+    setHasPhoto(Boolean(photoUrl));
+  }, [photoUrl]);
+
+  if (photoUrl && hasPhoto) {
     return (
-      <img
-        src={photoUrl}
-        alt={`Foto de perfil de ${name}`}
-        className="h-7 w-7 rounded-full border border-emerald-100 object-cover"
-      />
+      <span className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-emerald-100 bg-emerald-100 text-xs font-bold text-emerald-900">
+        <span
+          className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+            isLoading ? "opacity-100" : "opacity-0"
+          }`}
+          aria-hidden="true"
+        >
+          <LoaderCircle
+            className="h-4 w-4 animate-spin text-emerald-700"
+            strokeWidth={1.8}
+          />
+        </span>
+        <span className={isLoading ? "opacity-0" : "opacity-100"}>
+          {initial}
+        </span>
+        <img
+          src={photoUrl}
+          alt={`Foto de perfil de ${name}`}
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setIsLoading(false);
+            setHasPhoto(false);
+          }}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+            isLoading ? "opacity-0" : "opacity-100"
+          }`}
+        />
+      </span>
     );
   }
 
@@ -94,20 +125,7 @@ export const Header = ({
                 aria-label="Abrir menu"
                 onClick={onOpenMenu}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="h-6 w-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                  />
-                </svg>
+                <Menu className="h-6 w-6" strokeWidth={1.5} />
               </button>
 
               <BrandLink />
@@ -130,20 +148,7 @@ export const Header = ({
                     <span className="max-w-24 truncate sm:max-w-none">
                       {loggedClientName}
                     </span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={1.5}
-                      stroke="currentColor"
-                      className="h-4 w-4"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                      />
-                    </svg>
+                    <ChevronDown className="h-4 w-4" strokeWidth={1.5} />
                   </button>
 
                   {isUserMenuOpen ? (
@@ -184,20 +189,7 @@ export const Header = ({
                 className="cursor-pointer px-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
                 aria-label="Abrir busca"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="h-5 w-5 text-slate-500"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                  />
-                </svg>
+                <Search className="h-5 w-5 text-slate-500" strokeWidth={1.5} />
               </button>
             </div>
           </div>
@@ -224,20 +216,7 @@ export const Header = ({
             className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition-colors hover:bg-slate-50"
             aria-label="Fechar busca"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.8}
-              stroke="currentColor"
-              className="h-5 w-5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18 18 6M6 6l12 12"
-              />
-            </svg>
+            <X className="h-5 w-5" strokeWidth={1.8} />
           </button>
         </div>
 
@@ -249,20 +228,7 @@ export const Header = ({
               aria-label="Abrir menu"
               onClick={onOpenMenu}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="h-6 w-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                />
-              </svg>
+              <Menu className="h-6 w-6" strokeWidth={1.5} />
             </button>
 
             <BrandLink />
@@ -300,20 +266,7 @@ export const Header = ({
                   <span className="max-w-24 truncate sm:max-w-none">
                     {loggedClientName}
                   </span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.5}
-                    stroke="currentColor"
-                    className="h-4 w-4"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                    />
-                  </svg>
+                  <ChevronDown className="h-4 w-4" strokeWidth={1.5} />
                 </button>
 
                 {isUserMenuOpen ? (

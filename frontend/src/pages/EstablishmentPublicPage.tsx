@@ -1,11 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  AtSign,
+  Building2,
+  IdCard,
+  Phone,
+  User,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { AuthModal } from "../components/AuthModal";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
 import { BookingForm } from "../components/BookingForm";
 import api from "../services/api";
+import { getCategoryIcon } from "../utils/categoryIcons";
 
 interface Establishment {
   id: string;
@@ -184,6 +193,8 @@ export const EstablishmentPublicPage = () => {
     );
   }
 
+  const CategoryIcon = getCategoryIcon(establishment.categoria);
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <Header
@@ -222,9 +233,10 @@ export const EstablishmentPublicPage = () => {
           <div className="establishment-mount mb-4">
             <Link
               to="/"
-              className="inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
             >
-              ← Voltar
+              <ArrowLeft className="h-4 w-4" strokeWidth={2} />
+              Voltar
             </Link>
           </div>
 
@@ -285,45 +297,81 @@ export const EstablishmentPublicPage = () => {
                   )}
 
                   <div className="grid gap-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
-                    <p>
-                      <span className="font-semibold text-slate-900">
-                        Categoria:{" "}
+                    <p className="flex items-start gap-2">
+                      <CategoryIcon
+                        className="mt-0.5 h-4 w-4 shrink-0 text-slate-500"
+                        strokeWidth={1.8}
+                      />
+                      <span>
+                        <span className="font-semibold text-slate-900">
+                          Categoria:{" "}
+                        </span>
+                        {establishment.categoria}
                       </span>
-                      {establishment.categoria}
                     </p>
-                    <p>
-                      <span className="font-semibold text-slate-900">
-                        Telefone:{" "}
+                    <p className="flex items-start gap-2">
+                      <Phone
+                        className="mt-0.5 h-4 w-4 shrink-0 text-slate-500"
+                        strokeWidth={1.8}
+                      />
+                      <span>
+                        <span className="font-semibold text-slate-900">
+                          Telefone:{" "}
+                        </span>
+                        {establishment.telefone}
                       </span>
-                      {establishment.telefone}
                     </p>
                     {establishment.cnpj && (
-                      <p>
-                        <span className="font-semibold text-slate-900">
-                          CNPJ:{" "}
+                      <p className="flex items-start gap-2">
+                        <IdCard
+                          className="mt-0.5 h-4 w-4 shrink-0 text-slate-500"
+                          strokeWidth={1.8}
+                        />
+                        <span>
+                          <span className="font-semibold text-slate-900">
+                            CNPJ:{" "}
+                          </span>
+                          {establishment.cnpj}
                         </span>
-                        {establishment.cnpj}
                       </p>
                     )}
                     {establishment.razao_social && (
-                      <p>
-                        <span className="font-semibold text-slate-900">
-                          Razao social:{" "}
+                      <p className="flex items-start gap-2">
+                        <Building2
+                          className="mt-0.5 h-4 w-4 shrink-0 text-slate-500"
+                          strokeWidth={1.8}
+                        />
+                        <span>
+                          <span className="font-semibold text-slate-900">
+                            Razao social:{" "}
+                          </span>
+                          {establishment.razao_social}
                         </span>
-                        {establishment.razao_social}
                       </p>
                     )}
-                    <p>
-                      <span className="font-semibold text-slate-900">
-                        Responsavel:{" "}
+                    <p className="flex items-start gap-2">
+                      <User
+                        className="mt-0.5 h-4 w-4 shrink-0 text-slate-500"
+                        strokeWidth={1.8}
+                      />
+                      <span>
+                        <span className="font-semibold text-slate-900">
+                          Responsavel:{" "}
+                        </span>
+                        {establishment.responsavel}
                       </span>
-                      {establishment.responsavel}
                     </p>
-                    <p>
-                      <span className="font-semibold text-slate-900">
-                        Instagram:{" "}
+                    <p className="flex items-start gap-2">
+                      <AtSign
+                        className="mt-0.5 h-4 w-4 shrink-0 text-slate-500"
+                        strokeWidth={1.8}
+                      />
+                      <span>
+                        <span className="font-semibold text-slate-900">
+                          Instagram:{" "}
+                        </span>
+                        {establishment.instagram || EMPTY_LIST_MESSAGE}
                       </span>
-                      {establishment.instagram || EMPTY_LIST_MESSAGE}
                     </p>
                   </div>
 
@@ -369,9 +417,10 @@ export const EstablishmentPublicPage = () => {
                     <button
                       type="button"
                       onClick={() => setShowBookingForm(false)}
-                      className="inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                      className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
                     >
-                      ← Voltar aos detalhes
+                      <ArrowLeft className="h-4 w-4" strokeWidth={2} />
+                      Voltar aos detalhes
                     </button>
                     <div>
                       <h2 className="text-xl font-semibold text-slate-900">

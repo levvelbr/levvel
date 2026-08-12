@@ -1,4 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { X } from "lucide-react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
@@ -363,7 +364,7 @@ export const ClientForm = ({
                 className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
                 aria-label="Fechar formulário"
               >
-                ✕
+                <X className="h-5 w-5" strokeWidth={2} />
               </button>
             </div>
           </div>

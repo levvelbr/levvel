@@ -1,7 +1,11 @@
+import { X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { BookingForm, type BookingEstablishment } from "./BookingForm";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 export type { BookingEstablishment };
+
+const MODAL_EXIT_DURATION_MS = 220;
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -14,17 +18,55 @@ export const BookingModal = ({
   onClose,
   establishment,
 }: BookingModalProps) => {
-  useBodyScrollLock(isOpen && Boolean(establishment));
+  const [isRendered, setIsRendered] = useState(
+    isOpen && Boolean(establishment),
+  );
+  const [isModalClosing, setIsModalClosing] = useState(false);
 
-  if (!isOpen || !establishment) return null;
+  useBodyScrollLock(isRendered);
+
+  useEffect(() => {
+    if (isOpen && establishment) {
+      const timeoutId = window.setTimeout(() => {
+        setIsRendered(true);
+        setIsModalClosing(false);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    if (!isRendered) {
+      return;
+    }
+
+    const closeStartTimeoutId = window.setTimeout(() => {
+      setIsModalClosing(true);
+    }, 0);
+
+    const closeTimeoutId = window.setTimeout(() => {
+      setIsRendered(false);
+      setIsModalClosing(false);
+    }, MODAL_EXIT_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(closeStartTimeoutId);
+      window.clearTimeout(closeTimeoutId);
+    };
+  }, [establishment, isOpen, isRendered]);
+
+  if (!isRendered || !establishment) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm ${
+        isModalClosing ? "auth-modal-overlay-exit" : "auth-modal-overlay-enter"
+      }`}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-3xl bg-white shadow-xl max-h-[90vh] overflow-y-auto"
+        className={`auth-modal-panel max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-xl ${
+          isModalClosing ? "auth-modal-panel-exit" : "auth-modal-panel-enter"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
@@ -42,20 +84,7 @@ export const BookingModal = ({
             className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             aria-label="Fechar"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-              className="h-5 w-5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <X className="h-5 w-5" strokeWidth={2} />
           </button>
         </div>
 

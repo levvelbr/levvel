@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.endpoints import clientes, estabelecimentos, agendamentos, auth  # Adicionado estabelecimentos
+from app.api.v1.endpoints import clientes, estabelecimentos, agendamentos, auth, google_oauth  # Adicionado estabelecimentos
 
 app = FastAPI(
     title="Levvel API",
@@ -9,8 +9,9 @@ app = FastAPI(
 )
 
 origins = [
-    "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:8000",
+    "http://localhost:5173",
     "http://localhost:8000",
     "http://localhost:4173",
     "https://levvel.onrender.com",
@@ -31,6 +32,7 @@ app.include_router(clientes.router, prefix="/v1/clientes", tags=["Clientes"])
 app.include_router(estabelecimentos.router, prefix="/v1/estabelecimentos", tags=["Estabelecimentos"])
 app.include_router(agendamentos.router, prefix="/v1/agendamentos", tags=["Agendamentos"])
 app.include_router(auth.router, prefix="/v1/auth", tags=["Autenticação"])
+app.include_router(google_oauth.router, prefix="/v1/google_calendar", tags=["Google Calendar OAuth"])
 
 
 @app.get("/", tags=["Root"])

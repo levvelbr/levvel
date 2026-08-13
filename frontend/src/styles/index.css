@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+html {
+  scroll-behavior: smooth;
+}
+
+@theme {
+  /* =========================================
+     Esquema Azul (Blue Scheme)
+  ========================================= */
+
+  /* Cores da Marca */
+  --color-brand-primary-blue: #88b2cc;
+  --color-brand-secondary-blue: #62929e;
+
+  /* Light Theme - Azul */
+  --color-light-bg-blue: #f2f5f8;
+  --color-light-surface-blue: #ffffff;
+  --color-light-alt-blue: #f4f6f9;
+  --color-light-base-blue: #12181f;
+  --color-light-muted-blue: #1c242e;
+
+  /* Dark Theme - Azul */
+  --color-dark-bg-blue: #12181f;
+  --color-dark-surface-blue: #1c242e;
+  --color-dark-alt-blue: #283340;
+  --color-dark-base-blue: #f2f5f8;
+  --color-dark-muted-blue: #f4f6f9;
+
+  /* =========================================
+     Esquema Verde (Green Scheme)
+  ========================================= */
+
+  /* Cores da Marca */
+  --color-brand-primary-green: #87b38d;
+  --color-brand-secondary-green: #a3c9a8;
+
+  /* Light Theme - Verde */
+  --color-light-bg-green: #f7f9f7;
+  --color-light-surface-green: #ffffff;
+  --color-light-alt-green: #f4f7f5;
+  --color-light-base-green: #161c18;
+  --color-light-muted-green: #29332c;
+
+  /* Dark Theme - Verde */
+  --color-dark-bg-green: #161c18;
+  --color-dark-surface-green: #1e2621;
+  --color-dark-alt-green: #29332c;
+  --color-dark-base-green: #f7f9f7;
+  --color-dark-muted-green: #f4f7f5;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes mountFadeUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.establishment-mount {
+  animation: mountFadeUp 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.establishment-mount-delay-1 {
+  animation-delay: 80ms;
+}
+
+.establishment-mount-delay-2 {
+  animation-delay: 160ms;
+}
+
+@keyframes authModalOverlayIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes authModalOverlayOut {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes authModalPanelIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes authModalPanelOut {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.985);
+  }
+}
+
+@keyframes authModalContentIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes authModalContentOut {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+.auth-modal-overlay {
+  animation-duration: 220ms;
+  animation-fill-mode: both;
+}
+
+.auth-modal-overlay-enter {
+  animation-name: authModalOverlayIn;
+}
+
+.auth-modal-overlay-exit {
+  animation-name: authModalOverlayOut;
+}
+
+.auth-modal-panel {
+  animation-duration: 220ms;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.auth-modal-panel-enter {
+  animation-name: authModalPanelIn;
+}
+
+.auth-modal-panel-exit {
+  animation-name: authModalPanelOut;
+}
+
+.auth-modal-content-enter {
+  animation: authModalContentIn 230ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.auth-modal-content-exit {
+  animation: authModalContentOut 180ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .establishment-mount,
+  .establishment-mount-delay-1,
+  .establishment-mount-delay-2,
+  .auth-modal-overlay,
+  .auth-modal-panel,
+  .auth-modal-content-enter,
+  .auth-modal-content-exit {
+    animation: none;
+  }
+}

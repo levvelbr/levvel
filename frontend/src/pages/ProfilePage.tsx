@@ -1,0 +1,971 @@
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Check, Home, X } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { AuthModal } from "../components/AuthModal";
+import { Header } from "../components/Header";
+import { Sidebar } from "../components/Sidebar";
+import api from "../services/api";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ClienteProfile {
+  id: string;
+  nome_usuario: string;
+  nome_tratamento: string | null;
+  cpf: string;
+  data_nascimento: string;
+  genero: string | null;
+  email: string | null;
+  forma_pagamento_preferida: string | null;
+  localizacao_inicial: string | null;
+  foto_perfil_url: string | null;
+  criado_em: string;
+}
+
+interface EstabelecimentoProfile {
+  id: string;
+  nome_estabelecimento: string;
+  responsavel: string;
+  telefone: string;
+  email: string;
+  localizacao: string;
+  foto_estabelecimento_url: string | null;
+  cnpj: string | null;
+  razao_social: string | null;
+  categoria: string;
+  instagram: string | null;
+  servicos_oferecidos: string[];
+  tecnicas_utilizadas: string[];
+  produtos_aplicados: string[];
+  profissionais_envolvidos: string[];
+  ativo: boolean;
+  criado_em: string;
+}
+
+interface Agendamento {
+  id: string;
+  estabelecimento_id: string;
+  cliente_id: string;
+  profissional_envolvido: string;
+  tratamento: string;
+  tecnica: string | null;
+  produto: string | null;
+  data_hora_inicio: string;
+  duracao_estimada_minutos: number;
+  status:
+    | "pendente"
+    | "confirmado"
+    | "recusado"
+    | "em_andamento"
+    | "concluido"
+    | "cancelado";
+  motivo_recusa: string | null;
+  custo_final: number;
+  criado_em: string;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const STATUS_LABELS: Record<Agendamento["status"], string> = {
+  pendente: "Pendente",
+  confirmado: "Confirmado",
+  recusado: "Recusado",
+  em_andamento: "Em andamento",
+  concluido: "Concluído",
+  cancelado: "Cancelado",
+};
+
+const STATUS_COLORS: Record<Agendamento["status"], string> = {
+  pendente: "bg-amber-100 text-amber-800",
+  confirmado: "bg-emerald-100 text-emerald-800",
+  recusado: "bg-rose-100 text-rose-700",
+  em_andamento: "bg-sky-100 text-sky-800",
+  concluido: "bg-slate-100 text-slate-700",
+  cancelado: "bg-slate-100 text-slate-400",
+};
+
+const PAYMENT_LABELS: Record<string, string> = {
+  dinheiro: "Dinheiro",
+  cartao_debito: "Cartão de débito",
+  cartao_credito: "Cartão de crédito",
+  pix: "PIX",
+};
+
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+const inputClass =
+  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200";
+
+const sectionClass = "rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-6";
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export const ProfilePage = () => {
+  const { session, logout, updateSession } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"profile" | "bookings">(() =>
+    searchParams.get("tab") === "bookings" ? "bookings" : "profile",
+  );
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
+  const [photoUploadLoading, setPhotoUploadLoading] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
+
+  // ── Client state ────────────────────────────────────────────────────────────
+  const [clientProfile, setClientProfile] = useState<ClienteProfile | null>(
+    null,
+  );
+  const [clientLoading, setClientLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccess, setEditSuccess] = useState(false);
+  const [nomeTratamento, setNomeTratamento] = useState("");
+  const [genero, setGenero] = useState("");
+  const [formaPagamento, setFormaPagamento] = useState("");
+  const [localizacao, setLocalizacao] = useState("");
+  const [email, setEmail] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+
+  // ── Establishment state ──────────────────────────────────────────────────────
+  const [estabProfile, setEstabProfile] =
+    useState<EstabelecimentoProfile | null>(null);
+  const [estabLoading, setEstabLoading] = useState(false);
+
+  // ── Agendamentos state ───────────────────────────────────────────────────────
+  const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [agendamentosLoading, setAgendamentosLoading] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
+
+  // ── Data fetching ────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!session) return;
+
+    if (session.role === "cliente") {
+      setClientLoading(true);
+      api
+        .get("/v1/clientes/me")
+        .then((r) => {
+          const p = r.data as ClienteProfile;
+          setClientProfile(p);
+          setNomeTratamento(p.nome_tratamento ?? "");
+          setGenero(p.genero ?? "");
+          setFormaPagamento(p.forma_pagamento_preferida ?? "");
+          setLocalizacao(p.localizacao_inicial ?? "");
+          setEmail(p.email ?? "");
+          const preferredName = p.nome_tratamento?.trim() || p.nome_usuario;
+          updateSession({
+            nome: preferredName,
+            foto_perfil_url: p.foto_perfil_url ?? null,
+          });
+        })
+        .catch(() => {})
+        .finally(() => setClientLoading(false));
+    }
+
+    if (session.role === "estabelecimento") {
+      setEstabLoading(true);
+      api
+        .get("/v1/estabelecimentos/me")
+        .then((r) => {
+          const p = r.data as EstabelecimentoProfile;
+          setEstabProfile(p);
+          updateSession({
+            nome: p.nome_estabelecimento,
+            foto_perfil_url: p.foto_estabelecimento_url ?? null,
+          });
+        })
+        .catch(() => {})
+        .finally(() => setEstabLoading(false));
+    }
+  }, [session?.id, session?.role, updateSession]);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab") === "bookings" ? "bookings" : "profile";
+    setActiveTab(tab);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!session || activeTab !== "bookings") return;
+
+    setAgendamentosLoading(true);
+    const url =
+      session.role === "cliente"
+        ? `/v1/agendamentos/cliente/${session.id}`
+        : `/v1/agendamentos/estabelecimento/${session.id}`;
+
+    api
+      .get(url)
+      .then((r) => setAgendamentos(r.data as Agendamento[]))
+      .catch(() => setAgendamentos([]))
+      .finally(() => setAgendamentosLoading(false));
+  }, [session?.id, session?.role, activeTab]);
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  const handleClientUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditLoading(true);
+    setEditError(null);
+    setEditSuccess(false);
+
+    const body: Record<string, string | null> = {
+      nome_tratamento: nomeTratamento || null,
+      genero: genero || null,
+      forma_pagamento_preferida: formaPagamento || null,
+      localizacao_inicial: localizacao || null,
+      email: email || null,
+    };
+    if (novaSenha) body.senha = novaSenha;
+
+    try {
+      const r = await api.patch("/v1/clientes/me/update", body);
+      const updatedProfile = r.data as ClienteProfile;
+      setClientProfile(updatedProfile);
+      updateSession({
+        nome:
+          updatedProfile.nome_tratamento?.trim() || updatedProfile.nome_usuario,
+      });
+      setEditSuccess(true);
+      setIsEditing(false);
+      setNovaSenha("");
+    } catch (err: unknown) {
+      setEditError(
+        err instanceof Error ? err.message : "Erro ao atualizar perfil.",
+      );
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleStatusUpdate = async (
+    id: string,
+    status: Agendamento["status"],
+  ) => {
+    setStatusUpdating(id);
+    try {
+      const payload: {
+        status: Agendamento["status"];
+        motivo_recusa?: string | null;
+      } = {
+        status,
+      };
+
+      if (status === "recusado") {
+        payload.motivo_recusa = "Recusado pelo estabelecimento.";
+      }
+
+      await api.patch(`/v1/agendamentos/${id}/status`, payload);
+
+      setAgendamentos((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status } : a)),
+      );
+    } catch {
+      // ignore
+    } finally {
+      setStatusUpdating(null);
+    }
+  };
+
+  const handleFinalizeBooking = async (id: string) => {
+    setStatusUpdating(id);
+
+    try {
+      await api.post(
+        `/v1/agendamentos/${id}/encerrar`,
+        {},
+        {
+          params: {
+            custo_final: 0,
+          },
+        },
+      );
+
+      setAgendamentos((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: "concluido" } : a)),
+      );
+    } catch {
+      // ignore
+    } finally {
+      setStatusUpdating(null);
+    }
+  };
+
+  const handleChangeTab = (tab: "profile" | "bookings") => {
+    setActiveTab(tab);
+
+    if (tab === "bookings") {
+      setSearchParams({ tab: "bookings" }, { replace: true });
+      return;
+    }
+
+    setSearchParams({}, { replace: true });
+  };
+
+  const handlePhotoUpload = async () => {
+    if (!session || !selectedPhotoFile) {
+      return;
+    }
+
+    setPhotoUploadError(null);
+    setPhotoUploadLoading(true);
+
+    const formData = new FormData();
+    formData.append("file", selectedPhotoFile);
+
+    try {
+      if (session.role === "cliente") {
+        const response = await api.post(
+          "/v1/clientes/me/foto-perfil",
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          },
+        );
+
+        const updatedProfile = response.data as ClienteProfile;
+        setClientProfile(updatedProfile);
+        updateSession({
+          foto_perfil_url: updatedProfile.foto_perfil_url ?? null,
+        });
+      } else {
+        const response = await api.post(
+          "/v1/estabelecimentos/me/foto-perfil",
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          },
+        );
+
+        const updatedProfile = response.data as EstabelecimentoProfile;
+        setEstabProfile(updatedProfile);
+        updateSession({
+          foto_perfil_url: updatedProfile.foto_estabelecimento_url ?? null,
+        });
+      }
+
+      setSelectedPhotoFile(null);
+    } catch (err: unknown) {
+      setPhotoUploadError(
+        err instanceof Error
+          ? err.message
+          : "Nao foi possível enviar a foto de perfil.",
+      );
+    } finally {
+      setPhotoUploadLoading(false);
+    }
+  };
+
+  if (!session) return null;
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="flex min-h-screen flex-col bg-slate-50">
+      <Header
+        onOpenMenu={() => setIsSidebarOpen(true)}
+        loggedClientName={session.nome}
+        loggedClientPhotoUrl={session.foto_perfil_url ?? null}
+        onOpenLogin={() => setIsAuthModalOpen(true)}
+        onLogout={() => {
+          logout();
+          navigate("/");
+        }}
+      />
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthChange={() => setIsAuthModalOpen(false)}
+      />
+
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onOpenLogin={() => setIsAuthModalOpen(true)}
+      />
+
+      <main className="flex-1 px-4 py-8 sm:px-6">
+        <div className="mx-auto max-w-4xl space-y-6">
+          {/* Tabs */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              to="/"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+              aria-label="Voltar para a home"
+            >
+              <Home className="h-5 w-5" strokeWidth={1.8} />
+            </Link>
+
+            <div className="flex w-fit gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+              <button
+                type="button"
+                onClick={() => handleChangeTab("profile")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                  activeTab === "profile"
+                    ? "bg-emerald-700 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Meu perfil
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChangeTab("bookings")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                  activeTab === "bookings"
+                    ? "bg-emerald-700 text-white"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {session.role === "cliente" ? "Meus agendamentos" : "Agenda"}
+              </button>
+            </div>
+          </div>
+
+          {/* ── Profile tab ── */}
+          {activeTab === "profile" && session.role === "cliente" && (
+            <div className="space-y-6">
+              {/* Profile info */}
+              <div className={sectionClass}>
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    {clientProfile?.foto_perfil_url ? (
+                      <img
+                        src={clientProfile.foto_perfil_url}
+                        alt="Foto de perfil"
+                        className="h-16 w-16 rounded-2xl object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-lg font-semibold text-slate-500">
+                        {session.nome.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <h1 className="text-xl font-semibold text-slate-900">
+                        {clientLoading
+                          ? "Carregando..."
+                          : clientProfile?.nome_usuario}
+                      </h1>
+                      <p className="text-sm text-slate-500">
+                        {clientProfile?.email ?? session.email_ou_cpf}
+                      </p>
+                    </div>
+                  </div>
+                  {!isEditing && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditSuccess(false);
+                        setEditError(null);
+                        setIsEditing(true);
+                      }}
+                      className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      Editar
+                    </button>
+                  )}
+                </div>
+
+                <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Foto de perfil
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Envie uma imagem para aparecer no seu perfil e no cabeçalho.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        setSelectedPhotoFile(file);
+                        setPhotoUploadError(null);
+                      }}
+                      className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800"
+                    />
+                    <button
+                      type="button"
+                      disabled={!selectedPhotoFile || photoUploadLoading}
+                      onClick={handlePhotoUpload}
+                      className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                    >
+                      {photoUploadLoading ? "Enviando..." : "Salvar foto"}
+                    </button>
+                  </div>
+                  {photoUploadError ? (
+                    <p className="mt-2 text-sm text-rose-700">
+                      {photoUploadError}
+                    </p>
+                  ) : null}
+                </div>
+
+                {clientProfile && !isEditing && (
+                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="font-semibold text-slate-900">
+                        Como prefere ser chamado
+                      </dt>
+                      <dd className="text-slate-600">
+                        {clientProfile.nome_tratamento ?? "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-900">CPF</dt>
+                      <dd className="text-slate-600">
+                        {clientProfile.cpf.replace(
+                          /(\d{3})(\d{3})(\d{3})(\d{2})/,
+                          "$1.$2.$3-$4",
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-900">
+                        Data de nascimento
+                      </dt>
+                      <dd className="text-slate-600">
+                        {new Date(
+                          clientProfile.data_nascimento + "T00:00:00",
+                        ).toLocaleDateString("pt-BR")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-900">Gênero</dt>
+                      <dd className="text-slate-600">
+                        {clientProfile.genero ?? "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-900">
+                        Pagamento preferido
+                      </dt>
+                      <dd className="text-slate-600">
+                        {PAYMENT_LABELS[
+                          clientProfile.forma_pagamento_preferida ?? ""
+                        ] ?? "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-900">
+                        Localização
+                      </dt>
+                      <dd className="text-slate-600">
+                        {clientProfile.localizacao_inicial ?? "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                )}
+              </div>
+
+              {/* Edit form */}
+              {isEditing && (
+                <div className={sectionClass}>
+                  <h2 className="mb-4 text-lg font-semibold text-slate-900">
+                    Editar perfil
+                  </h2>
+
+                  {editError && (
+                    <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {editError}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleClientUpdate} className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">
+                          Como prefere ser chamado
+                        </label>
+                        <input
+                          value={nomeTratamento}
+                          onChange={(e) => setNomeTratamento(e.target.value)}
+                          placeholder="Apelido ou forma de tratamento"
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">
+                          Gênero
+                        </label>
+                        <input
+                          value={genero}
+                          onChange={(e) => setGenero(e.target.value)}
+                          placeholder="Ex: Feminino, Masculino, Outro"
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">
+                          Pagamento preferido
+                        </label>
+                        <select
+                          value={formaPagamento}
+                          onChange={(e) => setFormaPagamento(e.target.value)}
+                          className={inputClass}
+                        >
+                          <option value="">Selecione</option>
+                          <option value="dinheiro">Dinheiro</option>
+                          <option value="cartao_debito">
+                            Cartão de débito
+                          </option>
+                          <option value="cartao_credito">
+                            Cartão de crédito
+                          </option>
+                          <option value="pix">PIX</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">
+                          Localização
+                        </label>
+                        <input
+                          value={localizacao}
+                          onChange={(e) => setLocalizacao(e.target.value)}
+                          placeholder="Bairro ou cidade"
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">
+                          E-mail
+                        </label>
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="seu@email.com"
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-700">
+                          Nova senha{" "}
+                          <span className="font-normal text-slate-400">
+                            (deixe em branco para manter)
+                          </span>
+                        </label>
+                        <input
+                          type="password"
+                          value={novaSenha}
+                          onChange={(e) => setNovaSenha(e.target.value)}
+                          placeholder="Mínimo 6 caracteres"
+                          minLength={6}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={editLoading}
+                        className="flex-1 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                      >
+                        {editLoading ? "Salvando..." : "Salvar alterações"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {editSuccess && !isEditing && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+                  Perfil atualizado com sucesso.
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "profile" && session.role === "estabelecimento" && (
+            <div className={sectionClass}>
+              {estabLoading ? (
+                <p className="text-sm text-slate-500">Carregando perfil...</p>
+              ) : estabProfile ? (
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    {estabProfile.foto_estabelecimento_url ? (
+                      <img
+                        src={estabProfile.foto_estabelecimento_url}
+                        alt={estabProfile.nome_estabelecimento}
+                        className="h-16 w-16 rounded-2xl object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-400">
+                        Sem foto
+                      </div>
+                    )}
+                    <div>
+                      <h1 className="text-xl font-semibold text-slate-900">
+                        {estabProfile.nome_estabelecimento}
+                      </h1>
+                      <p className="text-sm text-slate-500">
+                        {estabProfile.categoria}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Foto de perfil
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Envie uma imagem para representar seu perfil de prestador.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null;
+                          setSelectedPhotoFile(file);
+                          setPhotoUploadError(null);
+                        }}
+                        className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800"
+                      />
+                      <button
+                        type="button"
+                        disabled={!selectedPhotoFile || photoUploadLoading}
+                        onClick={handlePhotoUpload}
+                        className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                      >
+                        {photoUploadLoading ? "Enviando..." : "Salvar foto"}
+                      </button>
+                    </div>
+                    {photoUploadError ? (
+                      <p className="mt-2 text-sm text-rose-700">
+                        {photoUploadError}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="font-semibold text-slate-900">
+                        Responsável
+                      </dt>
+                      <dd className="text-slate-600">
+                        {estabProfile.responsavel}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-900">Telefone</dt>
+                      <dd className="text-slate-600">
+                        {estabProfile.telefone}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-900">E-mail</dt>
+                      <dd className="text-slate-600">{estabProfile.email}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-slate-900">
+                        Localização
+                      </dt>
+                      <dd className="text-slate-600">
+                        {estabProfile.localizacao}
+                      </dd>
+                    </div>
+                    {estabProfile.cnpj && (
+                      <div>
+                        <dt className="font-semibold text-slate-900">CNPJ</dt>
+                        <dd className="text-slate-600">{estabProfile.cnpj}</dd>
+                      </div>
+                    )}
+                    {estabProfile.instagram && (
+                      <div>
+                        <dt className="font-semibold text-slate-900">
+                          Instagram
+                        </dt>
+                        <dd className="text-slate-600">
+                          {estabProfile.instagram}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+
+                  {estabProfile.servicos_oferecidos.length > 0 && (
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        Serviços
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {estabProfile.servicos_oferecidos.join(", ")}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-rose-600">
+                  Não foi possível carregar o perfil.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── Bookings tab ── */}
+          {activeTab === "bookings" && (
+            <div className="space-y-4">
+              {agendamentosLoading ? (
+                <div className={sectionClass}>
+                  <p className="text-sm text-slate-500">
+                    Carregando agendamentos...
+                  </p>
+                </div>
+              ) : agendamentos.length === 0 ? (
+                <div className={sectionClass}>
+                  <p className="text-sm text-slate-500">
+                    Nenhum agendamento encontrado.
+                  </p>
+                </div>
+              ) : (
+                agendamentos.map((ag) => (
+                  <div
+                    key={ag.id}
+                    className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900">
+                          {ag.tratamento}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          {ag.profissional_envolvido}
+                        </p>
+                        {ag.tecnica && (
+                          <p className="text-sm text-slate-500">
+                            Técnica: {ag.tecnica}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_COLORS[ag.status]}`}
+                      >
+                        {STATUS_LABELS[ag.status]}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
+                      <span>{formatDate(ag.data_hora_inicio)}</span>
+                      <span>{ag.duracao_estimada_minutos} min</span>
+                      {ag.custo_final > 0 && (
+                        <span>
+                          R${" "}
+                          {ag.custo_final.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </span>
+                      )}
+                    </div>
+
+                    {ag.motivo_recusa && (
+                      <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                        Motivo da recusa: {ag.motivo_recusa}
+                      </p>
+                    )}
+
+                    {/* Establishment status actions */}
+                    {session.role === "estabelecimento" && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {ag.status === "pendente" && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={statusUpdating === ag.id}
+                              onClick={() =>
+                                handleStatusUpdate(ag.id, "confirmado")
+                              }
+                              className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                            >
+                              <Check className="h-3.5 w-3.5" strokeWidth={2} />
+                              Confirmar
+                            </button>
+                            <button
+                              type="button"
+                              disabled={statusUpdating === ag.id}
+                              onClick={() =>
+                                handleStatusUpdate(ag.id, "recusado")
+                              }
+                              className="flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                            >
+                              <X className="h-3.5 w-3.5" strokeWidth={2} />
+                              Recusar
+                            </button>
+                          </>
+                        )}
+                        {ag.status === "confirmado" && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={statusUpdating === ag.id}
+                              onClick={() =>
+                                handleStatusUpdate(ag.id, "em_andamento")
+                              }
+                              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+                            >
+                              Iniciar atendimento
+                            </button>
+                            <button
+                              type="button"
+                              disabled={statusUpdating === ag.id}
+                              onClick={() =>
+                                handleStatusUpdate(ag.id, "cancelado")
+                              }
+                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                            >
+                              Cancelar
+                            </button>
+                          </>
+                        )}
+                        {ag.status === "em_andamento" && (
+                          <button
+                            type="button"
+                            disabled={statusUpdating === ag.id}
+                            onClick={() => handleFinalizeBooking(ag.id)}
+                            className="rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800 disabled:opacity-60"
+                          >
+                            {statusUpdating === ag.id
+                              ? "Finalizando..."
+                              : "Finalizar atendimento"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+};

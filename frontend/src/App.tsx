@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { Footer } from "./components/Footer";
 import { AuthProvider } from "./contexts/AuthContext";
 import { EstablishmentPublicPage } from "./pages/EstablishmentPublicPage";
@@ -40,6 +41,7 @@ export const App = () => {
           </div>
           <Footer />
         </div>
+        <Analytics />
       </AuthProvider>
     </BrowserRouter>
   );

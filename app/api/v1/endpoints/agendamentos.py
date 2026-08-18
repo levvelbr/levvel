@@ -2,7 +2,6 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status, Query
 import logging
-from ultralytics import settings
 from app.api.v1.endpoints.google_calendar import criar_agendamento
 from app.schemas.agendamento import (
     AgendamentoCreate, 

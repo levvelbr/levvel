@@ -139,6 +139,7 @@ export const EstablishmentPublicPage = () => {
           onOpenMenu={() => setIsSidebarOpen(true)}
           loggedClientName={session?.nome ?? null}
           loggedClientPhotoUrl={session?.foto_perfil_url ?? null}
+          loggedClientRole={session?.role ?? null}
           onOpenLogin={() => setIsAuthModalOpen(true)}
           onLogout={() => {
             logout();
@@ -168,6 +169,7 @@ export const EstablishmentPublicPage = () => {
           onOpenMenu={() => setIsSidebarOpen(true)}
           loggedClientName={session?.nome ?? null}
           loggedClientPhotoUrl={session?.foto_perfil_url ?? null}
+          loggedClientRole={session?.role ?? null}
           onOpenLogin={() => setIsAuthModalOpen(true)}
           onLogout={() => {
             logout();
@@ -204,6 +206,7 @@ export const EstablishmentPublicPage = () => {
         onOpenMenu={() => setIsSidebarOpen(true)}
         loggedClientName={session?.nome ?? null}
         loggedClientPhotoUrl={session?.foto_perfil_url ?? null}
+        loggedClientRole={session?.role ?? null}
         onOpenLogin={() => setIsAuthModalOpen(true)}
         onLogout={() => {
           logout();

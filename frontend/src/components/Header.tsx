@@ -7,6 +7,7 @@ interface HeaderProps extends HTMLAttributes<HTMLElement> {
   onOpenMenu: () => void;
   loggedClientName: string | null;
   loggedClientPhotoUrl?: string | null;
+  loggedClientRole?: "cliente" | "estabelecimento" | null;
   onOpenLogin: () => void;
   onLogout: () => void;
   showSearchBar?: boolean;
@@ -21,6 +22,27 @@ interface UserAvatarProps {
   photoUrl?: string | null;
   compact?: boolean;
 }
+
+const ROLE_LABELS: Record<"cliente" | "estabelecimento", string> = {
+  cliente: "Cliente",
+  estabelecimento: "Estabelecimento",
+};
+
+interface UserMenuHeaderProps {
+  name: string;
+  role?: "cliente" | "estabelecimento" | null;
+}
+
+const UserMenuHeader = ({ name, role }: UserMenuHeaderProps) => (
+  <div className="mb-2 border-b border-slate-100 px-3 pb-2">
+    <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
+    {role ? (
+      <span className="text-xs font-medium text-emerald-700">
+        {ROLE_LABELS[role]}
+      </span>
+    ) : null}
+  </div>
+);
 
 const UserAvatar = ({ name, photoUrl, compact = false }: UserAvatarProps) => {
   const normalizedName = name.trim();
@@ -99,6 +121,7 @@ export const Header = ({
   onOpenMenu,
   loggedClientName,
   loggedClientPhotoUrl,
+  loggedClientRole,
   onOpenLogin,
   onLogout,
   showSearchBar = false,
@@ -177,6 +200,10 @@ export const Header = ({
 
                   {isUserMenuOpen ? (
                     <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                      <UserMenuHeader
+                        name={loggedClientName}
+                        role={loggedClientRole}
+                      />
                       <Link
                         to="/perfil"
                         onClick={() => setIsUserMenuOpen(false)}
@@ -267,6 +294,10 @@ export const Header = ({
 
                   {isUserMenuOpen ? (
                     <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                      <UserMenuHeader
+                        name={loggedClientName}
+                        role={loggedClientRole}
+                      />
                       <Link
                         to="/perfil"
                         onClick={() => setIsUserMenuOpen(false)}
@@ -371,6 +402,10 @@ export const Header = ({
 
                 {isUserMenuOpen ? (
                   <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                    <UserMenuHeader
+                      name={loggedClientName}
+                      role={loggedClientRole}
+                    />
                     <Link
                       to="/perfil"
                       onClick={() => setIsUserMenuOpen(false)}

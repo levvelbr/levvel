@@ -421,6 +421,7 @@ export const DashboardLayout = ({
         onOpenMenu={() => setIsSidebarOpen(true)}
         loggedClientName={session?.nome ?? null}
         loggedClientPhotoUrl={session?.foto_perfil_url ?? null}
+        loggedClientRole={session?.role ?? null}
         onOpenLogin={() => setIsAuthModalOpen(true)}
         onLogout={() => {
           logout();

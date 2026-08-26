@@ -4,6 +4,7 @@ import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
 import { getDocumentDigits, maskCnpj } from "../utils/documentMasks";
+import { getApiErrorMessage } from "../utils/apiErrors";
 
 interface FormValues {
   nome_estabelecimento: string;
@@ -731,6 +732,8 @@ export const Form = () => {
     if (stepNumber === 3) {
       if (!formValues.senha_hash.trim()) {
         newErrors.senha_hash = "Senha é obrigatória";
+      } else if (formValues.senha_hash.trim().length < 6) {
+        newErrors.senha_hash = "Senha deve ter pelo menos 6 caracteres";
       }
       if (!formValues.confirmar_senha.trim()) {
         newErrors.confirmar_senha = "Confirmação de senha é obrigatória";
@@ -809,7 +812,7 @@ export const Form = () => {
       setPhotoInputKey((prev) => prev + 1);
       setCurrentStep(1);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getApiErrorMessage(error);
       setServerError(`Falha ao cadastrar estabelecimento: ${message}`);
     } finally {
       setIsSubmitting(false);

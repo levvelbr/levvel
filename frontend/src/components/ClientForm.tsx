@@ -6,6 +6,7 @@ import api from "../services/api";
 import type { UserSession } from "../types/auth";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { maskCpf } from "../utils/documentMasks";
+import { getApiErrorMessage } from "../utils/apiErrors";
 
 interface ClientFormValues {
   nome_usuario: string;
@@ -52,21 +53,6 @@ const validateCpf = (value: string) => {
 };
 
 const validateEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
-
-const extractErrorMessage = (error: unknown) => {
-  const responseData =
-    typeof error === "object" && error !== null && "response" in error
-      ? (error as { response?: { data?: unknown } }).response?.data
-      : undefined;
-
-  return typeof responseData === "string"
-    ? responseData
-    : responseData
-      ? JSON.stringify(responseData)
-      : error instanceof Error
-        ? error.message
-        : String(error);
-};
 
 const parseUserSession = (
   data: Partial<UserSession> | undefined,
@@ -191,6 +177,8 @@ export const ClientForm = ({
     if (stepNumber === 2) {
       if (!formValues.senha.trim()) {
         nextErrors.senha = "Senha é obrigatória";
+      } else if (formValues.senha.trim().length < 6) {
+        nextErrors.senha = "Senha deve ter pelo menos 6 caracteres";
       }
       if (!formValues.confirmar_senha.trim()) {
         nextErrors.confirmar_senha = "Confirmação de senha é obrigatória";
@@ -288,6 +276,7 @@ export const ClientForm = ({
       const loginResponse = await api.post("/v1/auth/login", {
         identificador: values.email.trim().toLowerCase(),
         senha: values.senha,
+        role: "cliente",
       });
 
       const session = parseUserSession(
@@ -299,7 +288,7 @@ export const ClientForm = ({
       onLoginSuccess(session);
       onClose();
     } catch (error: unknown) {
-      const message = extractErrorMessage(error);
+      const message = getApiErrorMessage(error);
 
       setServerError(
         clientCreated

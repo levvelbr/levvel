@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
-import { X } from "lucide-react";
+import { LocateFixed, X } from "lucide-react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
@@ -7,6 +7,10 @@ import type { UserSession } from "../types/auth";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { maskCpf } from "../utils/documentMasks";
 import { getApiErrorMessage } from "../utils/apiErrors";
+import {
+  getCurrentLocationLabel,
+  getGeolocationErrorMessage,
+} from "../utils/geolocation";
 
 interface ClientFormValues {
   nome_usuario: string;
@@ -99,6 +103,8 @@ export const ClientForm = ({
   const [currentStep, setCurrentStep] = useState(1);
   const [showTermsAlert, setShowTermsAlert] = useState(false);
   const [hasAttemptedSubmitStep2, setHasAttemptedSubmitStep2] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentStep === 2) {
@@ -107,6 +113,25 @@ export const ClientForm = ({
       setErrors({});
     }
   }, [currentStep]);
+
+  const handleUseCurrentLocation = async () => {
+    setIsLocating(true);
+    setLocationError(null);
+
+    try {
+      const label = await getCurrentLocationLabel();
+      setValues((prev) => ({ ...prev, localizacao_inicial: label }));
+      setErrors((prev) => {
+        const nextErrors = { ...prev };
+        delete nextErrors.localizacao_inicial;
+        return nextErrors;
+      });
+    } catch (error) {
+      setLocationError(getGeolocationErrorMessage(error));
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   const handleChange = (
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -131,6 +156,9 @@ export const ClientForm = ({
       delete nextErrors[name as keyof ClientFormValues];
       return nextErrors;
     });
+    if (name === "localizacao_inicial") {
+      setLocationError(null);
+    }
     if (name === "termos_aceitos") {
       const isChecked =
         event.target instanceof HTMLInputElement ? event.target.checked : false;
@@ -499,12 +527,33 @@ export const ClientForm = ({
                   <span className="text-sm font-medium text-slate-700">
                     Localização inicial *
                   </span>
-                  <Input
-                    name="localizacao_inicial"
-                    value={values.localizacao_inicial}
-                    onChange={handleChange}
-                    placeholder="Cidade ou bairro"
-                  />
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      name="localizacao_inicial"
+                      value={values.localizacao_inicial}
+                      onChange={handleChange}
+                      placeholder="Cidade ou bairro"
+                      className="sm:flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleUseCurrentLocation}
+                      disabled={isLocating}
+                      className="shrink-0 whitespace-nowrap px-3 py-2.5 text-sm"
+                    >
+                      <LocateFixed
+                        className="mr-1.5 h-4 w-4"
+                        strokeWidth={1.8}
+                      />
+                      {isLocating ? "Localizando..." : "Usar minha localização"}
+                    </Button>
+                  </div>
+                  {locationError ? (
+                    <span className="text-sm text-red-500">
+                      {locationError}
+                    </span>
+                  ) : null}
                   {errors.localizacao_inicial ? (
                     <span className="text-sm text-red-500">
                       {errors.localizacao_inicial}

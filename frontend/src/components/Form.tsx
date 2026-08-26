@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
-import { getDocumentDigits, maskCnpj } from "../utils/documentMasks";
+import { getDocumentDigits, maskCnpj, maskPhone } from "../utils/documentMasks";
 import { getApiErrorMessage } from "../utils/apiErrors";
 
 interface FormValues {
@@ -22,7 +22,7 @@ interface FormValues {
   profissionais_envolvidos: string;
   senha_hash: string;
   confirmar_senha: string;
-  aceitou_termos: boolean;
+  termos_aceitos: boolean;
 }
 
 type WeekDayKey =
@@ -391,7 +391,7 @@ const initialFormValues: FormValues = {
   profissionais_envolvidos: "",
   senha_hash: "",
   confirmar_senha: "",
-  aceitou_termos: false,
+  termos_aceitos: false,
 };
 
 const validateEmail = (value: string) =>
@@ -448,7 +448,12 @@ export const Form = () => {
   ) => {
     const { name, value } = event.target;
 
-    const nextValue = name === "cnpj" ? maskCnpj(value) : value;
+    const nextValue =
+      name === "cnpj"
+        ? maskCnpj(value)
+        : name === "telefone"
+          ? maskPhone(value)
+          : value;
 
     setValues((prev) => ({ ...prev, [name]: nextValue }));
     setErrors((prev) => {
@@ -469,10 +474,10 @@ export const Form = () => {
 
   const handleTermsChange = (event: ChangeEvent<HTMLInputElement>) => {
     const checked = event.target.checked;
-    setValues((prev) => ({ ...prev, aceitou_termos: checked }));
+    setValues((prev) => ({ ...prev, termos_aceitos: checked }));
     setErrors((prev) => {
       const nextErrors = { ...prev };
-      delete nextErrors.aceitou_termos;
+      delete nextErrors.termos_aceitos;
       return nextErrors;
     });
     setServerError(null);
@@ -740,8 +745,8 @@ export const Form = () => {
       } else if (formValues.senha_hash !== formValues.confirmar_senha) {
         newErrors.confirmar_senha = "As senhas não conferem";
       }
-      if (!formValues.aceitou_termos) {
-        newErrors.aceitou_termos =
+      if (!formValues.termos_aceitos) {
+        newErrors.termos_aceitos =
           "Voce precisa aceitar os termos para continuar";
       }
     }
@@ -794,7 +799,7 @@ export const Form = () => {
       profissionais_envolvidos: parseCsv(values.profissionais_envolvidos),
       horario_funcionamento: buildSchedulePayload(schedule),
       senha_hash: values.senha_hash,
-      aceitou_termos: values.aceitou_termos,
+      termos_aceitos: values.termos_aceitos,
     };
 
     setIsSubmitting(true);
@@ -825,9 +830,9 @@ export const Form = () => {
       onSubmit={handleSubmit}
       className="rounded-3xl bg-white/95 p-8 shadow-md ring-1 ring-slate-200"
     >
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold text-emerald-900">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold text-emerald-900 sm:text-2xl">
             Cadastro de estabelecimento
           </h2>
           <p className="mt-0.5 text-sm text-slate-500">
@@ -835,7 +840,7 @@ export const Form = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {[1, 2, 3].map((step) => {
             const isActive = currentStep === step;
             const isCompleted = currentStep > step;
@@ -843,7 +848,7 @@ export const Form = () => {
             return (
               <div
                 key={step}
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold sm:h-8 sm:w-8 sm:text-sm ${
                   isActive
                     ? "bg-emerald-700 text-white"
                     : isCompleted
@@ -916,7 +921,7 @@ export const Form = () => {
                 type="file"
                 accept="image/*"
                 onChange={handlePhotoChange}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300"
               />
               {photoFile ? (
                 <span className="text-xs text-slate-500">
@@ -937,7 +942,7 @@ export const Form = () => {
                 name="telefone"
                 value={values.telefone}
                 onChange={handleChange}
-                placeholder="(00) 00000-0000"
+                placeholder="(00) 0 0000-0000"
               />
               {errors.telefone && <ErrorBadge message={errors.telefone} />}
             </label>
@@ -1049,7 +1054,7 @@ export const Form = () => {
                       }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                        <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
                           <input
                             type="checkbox"
                             checked={daySchedule.ativo}
@@ -1063,7 +1068,7 @@ export const Form = () => {
                           </span>
                           <span>{day.label}</span>
                           {dayErrorBadge.hasError ? (
-                            <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700">
+                            <span className="w-full basis-full wrap-break-word rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700 sm:w-auto sm:basis-auto">
                               {dayErrorBadge.message}
                             </span>
                           ) : null}
@@ -1379,8 +1384,8 @@ export const Form = () => {
               <label className="flex items-start gap-3 text-sm text-slate-700">
                 <input
                   type="checkbox"
-                  name="aceitou_termos"
-                  checked={values.aceitou_termos}
+                  name="termos_aceitos"
+                  checked={values.termos_aceitos}
                   onChange={handleTermsChange}
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
                 />
@@ -1397,8 +1402,8 @@ export const Form = () => {
                   .
                 </span>
               </label>
-              {errors.aceitou_termos ? (
-                <ErrorBadge message={errors.aceitou_termos} />
+              {errors.termos_aceitos ? (
+                <ErrorBadge message={errors.termos_aceitos} />
               ) : null}
             </div>
           </>

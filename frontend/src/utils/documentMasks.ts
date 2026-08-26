@@ -58,3 +58,22 @@ export const maskCpfOrCnpj = (value: string) => {
 
 export const getDocumentDigits = (value: string, maxDigits = 14) =>
   digitsOnly(value).slice(0, maxDigits);
+
+/** Formats to the standard Brazilian mobile pattern: (00) 0 0000-0000. */
+export const maskPhone = (value: string) => {
+  const digits = digitsOnly(value).slice(0, 11);
+
+  if (digits.length <= 2) {
+    return digits.length ? `(${digits}` : digits;
+  }
+
+  if (digits.length <= 3) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  }
+
+  if (digits.length <= 7) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3)}`;
+  }
+
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
+};

@@ -19,7 +19,7 @@ interface ClientFormValues {
   localizacao_inicial: string;
   senha: string;
   confirmar_senha: string;
-  aceitou_termos: boolean;
+  termos_aceitos: boolean;
 }
 
 type ClientFormErrors = Partial<Record<keyof ClientFormValues, string>>;
@@ -44,7 +44,7 @@ const initialFormValues: ClientFormValues = {
   localizacao_inicial: "",
   senha: "",
   confirmar_senha: "",
-  aceitou_termos: false,
+  termos_aceitos: false,
 };
 
 const validateCpf = (value: string) => {
@@ -131,7 +131,7 @@ export const ClientForm = ({
       delete nextErrors[name as keyof ClientFormValues];
       return nextErrors;
     });
-    if (name === "aceitou_termos") {
+    if (name === "termos_aceitos") {
       const isChecked =
         event.target instanceof HTMLInputElement ? event.target.checked : false;
       if (isChecked) {
@@ -185,8 +185,8 @@ export const ClientForm = ({
       } else if (formValues.senha !== formValues.confirmar_senha) {
         nextErrors.confirmar_senha = "As senhas não conferem";
       }
-      if (!formValues.aceitou_termos) {
-        nextErrors.aceitou_termos =
+      if (!formValues.termos_aceitos) {
+        nextErrors.termos_aceitos =
           "Voce precisa aceitar os termos para continuar";
       }
     }
@@ -199,7 +199,7 @@ export const ClientForm = ({
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
-      if (currentStep === 2 && !values.aceitou_termos) {
+      if (currentStep === 2 && !values.termos_aceitos) {
         setShowTermsAlert(true);
       }
       return;
@@ -239,7 +239,7 @@ export const ClientForm = ({
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
-      if (!values.aceitou_termos) {
+      if (!values.termos_aceitos) {
         setShowTermsAlert(true);
       }
       return;
@@ -256,7 +256,7 @@ export const ClientForm = ({
       forma_pagamento_preferida: values.forma_pagamento_preferida,
       localizacao_inicial: values.localizacao_inicial.trim(),
       senha: values.senha,
-      aceitou_termos: values.aceitou_termos,
+      termos_aceitos: values.termos_aceitos,
     };
 
     const trimmedTreatment = values.nome_tratamento.trim();
@@ -560,8 +560,8 @@ export const ClientForm = ({
                   <label className="flex items-start gap-3 text-sm text-slate-700">
                     <input
                       type="checkbox"
-                      name="aceitou_termos"
-                      checked={values.aceitou_termos}
+                      name="termos_aceitos"
+                      checked={values.termos_aceitos}
                       onChange={handleChange}
                       className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
                     />

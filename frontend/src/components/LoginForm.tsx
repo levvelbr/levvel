@@ -3,13 +3,15 @@ import { X } from "lucide-react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
-import type { UserSession } from "../types/auth";
+import type { UserRole, UserSession } from "../types/auth";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { getDocumentDigits, maskCpfOrCnpj } from "../utils/documentMasks";
+import { getApiErrorMessage } from "../utils/apiErrors";
 
 interface LoginFormValues {
   identificador: string;
   senha: string;
+  role: UserRole;
 }
 
 interface LoginFormProps {
@@ -24,6 +26,16 @@ interface LoginFormProps {
 const initialValues: LoginFormValues = {
   identificador: "",
   senha: "",
+  role: "cliente",
+};
+
+/** CNPJ has 14 digits, so any identifier with more than 11 digits (and no letters/@) is treated as a CNPJ. */
+const isCnpjIdentifier = (rawValue: string) => {
+  const trimmed = rawValue.trim();
+  if (!trimmed || /[A-Za-z@]/.test(trimmed)) {
+    return false;
+  }
+  return getDocumentDigits(trimmed, 14).length > 11;
 };
 
 export const LoginForm = ({
@@ -39,6 +51,11 @@ export const LoginForm = ({
   const [values, setValues] = useState<LoginFormValues>(initialValues);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isEstablishmentForced = isCnpjIdentifier(values.identificador);
+  const effectiveRole: UserRole = isEstablishmentForced
+    ? "estabelecimento"
+    : values.role;
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -79,6 +96,7 @@ export const LoginForm = ({
       const payload = {
         identificador: normalizedIdentifier,
         senha: values.senha,
+        role: effectiveRole,
       };
 
       const response = await api.post("/v1/auth/login", payload);
@@ -114,20 +132,7 @@ export const LoginForm = ({
       onLoginSuccess(session);
       onClose();
     } catch (error: unknown) {
-      const responseData =
-        typeof error === "object" && error !== null && "response" in error
-          ? (error as { response?: { data?: unknown } }).response?.data
-          : undefined;
-      const message =
-        typeof responseData === "string"
-          ? responseData
-          : responseData
-            ? JSON.stringify(responseData)
-            : error instanceof Error
-              ? error.message
-              : String(error);
-
-      setError(`Falha ao entrar: ${message}`);
+      setError(`Falha ao entrar: ${getApiErrorMessage(error)}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -145,7 +150,7 @@ export const LoginForm = ({
       onClick={onClose}
     >
       <div
-        className={`auth-modal-panel w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl transition-[max-width] duration-300 ease-in-out sm:p-6 ${
+        className={`auth-modal-panel w-full max-h-[90vh] overflow-y-auto overflow-x-hidden rounded-3xl bg-white p-4 shadow-2xl transition-[max-width] duration-300 ease-in-out sm:p-6 ${
           isMorphingToRegister ? "max-w-2xl" : "max-w-md"
         } ${
           isClosing
@@ -213,6 +218,53 @@ export const LoginForm = ({
                 placeholder="Digite sua senha"
               />
             </label>
+
+            <div className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">
+                Você é *
+              </span>
+              <div className="flex gap-4">
+                <label
+                  className={`flex items-center gap-2 text-sm ${
+                    isEstablishmentForced ? "text-slate-400" : "text-slate-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value="cliente"
+                    checked={effectiveRole === "cliente"}
+                    onChange={handleChange}
+                    disabled={isEstablishmentForced}
+                    className="h-4 w-4 text-emerald-700 focus:ring-emerald-500"
+                  />
+                  Cliente
+                </label>
+                <label
+                  className={`flex items-center gap-2 text-sm ${
+                    isEstablishmentForced
+                      ? "font-semibold text-emerald-700"
+                      : "text-slate-700"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value="estabelecimento"
+                    checked={effectiveRole === "estabelecimento"}
+                    onChange={handleChange}
+                    disabled={isEstablishmentForced}
+                    className="h-4 w-4 text-emerald-700 focus:ring-emerald-500"
+                  />
+                  Estabelecimento
+                </label>
+              </div>
+              {isEstablishmentForced ? (
+                <p className="text-xs text-slate-500">
+                  CNPJ detectado: login automático como estabelecimento.
+                </p>
+              ) : null}
+            </div>
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Entrando..." : "Entrar"}

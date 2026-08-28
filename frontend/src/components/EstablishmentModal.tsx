@@ -95,7 +95,7 @@ export const EstablishmentModal = ({
           </div>
         </div>
 
-        <div className="scrollbar-none overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+        <div className="scrollbar-none overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6">
           <Form />
         </div>
       </div>

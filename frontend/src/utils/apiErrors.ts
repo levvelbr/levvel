@@ -35,6 +35,33 @@ const getFieldLabel = (loc?: (string | number)[]) => {
   return FIELD_LABELS[fieldName] ?? fieldName;
 };
 
+const DUPLICATE_KEY_LABELS: Record<string, string> = {
+  cpf: "CPF",
+  cnpj: "CNPJ",
+  email: "e-mail",
+  telefone: "telefone",
+};
+
+/** Maps a raw Postgres "duplicate key value violates unique constraint" message to friendly text. */
+const describeDuplicateKeyError = (detail: string) => {
+  const match = detail.match(
+    /duplicate key value violates unique constraint "?(\w+)"?/i,
+  );
+  if (!match) {
+    return null;
+  }
+
+  const constraintName = match[1].toLowerCase();
+  const fieldKey = Object.keys(DUPLICATE_KEY_LABELS).find((key) =>
+    constraintName.includes(key),
+  );
+  const fieldLabel = fieldKey ? DUPLICATE_KEY_LABELS[fieldKey] : null;
+
+  return fieldLabel
+    ? `Já existe um cadastro com este ${fieldLabel}.`
+    : "Já existe um cadastro com esses dados.";
+};
+
 const describeValidationError = (item: ValidationErrorItem) => {
   const label = getFieldLabel(item.loc);
   const minLength = item.ctx?.min_length;
@@ -87,12 +114,12 @@ export const getApiErrorMessage = (
     }
 
     if (typeof detail === "string") {
-      return detail;
+      return describeDuplicateKeyError(detail) ?? detail;
     }
   }
 
   if (typeof responseData === "string") {
-    return responseData;
+    return describeDuplicateKeyError(responseData) ?? responseData;
   }
 
   return error instanceof Error ? error.message : fallback;

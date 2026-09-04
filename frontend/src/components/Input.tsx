@@ -1,7 +1,7 @@
 import { forwardRef, useState, type InputHTMLAttributes } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
-interface Props extends InputHTMLAttributes<HTMLInputElement> {}
+type Props = InputHTMLAttributes<HTMLInputElement>;
 
 export const Input = forwardRef<HTMLInputElement, Props>(
   ({ className = "", type, ...rest }, ref) => {
@@ -14,7 +14,7 @@ export const Input = forwardRef<HTMLInputElement, Props>(
         type={
           isPasswordField ? (isPasswordVisible ? "text" : "password") : type
         }
-        className={`w-full rounded-xl border-none px-3 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 ${
+        className={`w-full rounded-xl border-none px-3 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:placeholder:text-slate-400 ${
           isPasswordField ? "pr-10" : ""
         } ${className}`}
         {...rest}

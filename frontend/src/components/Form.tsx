@@ -1,10 +1,20 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { ArrowLeft } from "lucide-react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+import { ArrowLeft, ChevronDown, LocateFixed, X } from "lucide-react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
 import { getDocumentDigits, maskCnpj, maskPhone } from "../utils/documentMasks";
 import { getApiErrorMessage } from "../utils/apiErrors";
+import {
+  getCurrentLocationLabel,
+  getGeolocationErrorMessage,
+} from "../utils/geolocation";
 
 interface FormValues {
   nome_estabelecimento: string;
@@ -23,6 +33,22 @@ interface FormValues {
   senha_hash: string;
   confirmar_senha: string;
   termos_aceitos: boolean;
+}
+
+interface IbgeState {
+  id: number;
+  sigla: string;
+  nome: string;
+}
+
+interface IbgeCity {
+  id: number;
+  nome: string;
+}
+
+interface ServiceCity {
+  state: string;
+  city: string;
 }
 
 type WeekDayKey =
@@ -394,6 +420,10 @@ const initialFormValues: FormValues = {
   termos_aceitos: false,
 };
 
+const initialServiceCity = (): ServiceCity => ({ state: "", city: "" });
+
+const LOCATION_MODAL_EXIT_DURATION_MS = 220;
+
 const validateEmail = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -414,6 +444,110 @@ const ErrorBadge = ({ message }: { message: string }) => (
   </span>
 );
 
+interface SearchableOption {
+  value: string;
+  label: string;
+}
+
+interface SearchableSelectProps {
+  value: string;
+  options: SearchableOption[];
+  onChange: (value: string) => void;
+  placeholder: string;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
+const SearchableSelect = ({
+  value,
+  options,
+  onChange,
+  placeholder,
+  disabled = false,
+  loading = false,
+}: SearchableSelectProps) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const selectedOption = options.find((option) => option.value === value);
+  const [query, setQuery] = useState(selectedOption?.label ?? "");
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+        setQuery(selectedOption?.label ?? "");
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [selectedOption?.label]);
+
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const filteredOptions = options.filter((option) =>
+    `${option.label} ${option.value}`
+      .toLocaleLowerCase()
+      .includes(normalizedQuery),
+  );
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          value={query}
+          disabled={disabled}
+          placeholder={loading ? "Carregando..." : placeholder}
+          onFocus={() => setIsOpen(true)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setIsOpen(true);
+          }}
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        />
+        <ChevronDown
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+          strokeWidth={2}
+        />
+      </div>
+
+      {isOpen && !disabled ? (
+        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+          {loading ? (
+            <p className="px-3 py-2 text-sm text-slate-500">
+              Carregando opções...
+            </p>
+          ) : filteredOptions.length ? (
+            filteredOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onChange(option.value);
+                  setQuery(option.label);
+                  setIsOpen(false);
+                }}
+                className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-emerald-50 hover:text-emerald-900 ${
+                  option.value === value
+                    ? "bg-emerald-100 font-semibold text-emerald-900"
+                    : "text-slate-700"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))
+          ) : (
+            <p className="px-3 py-2 text-sm text-slate-500">
+              Nenhuma opção encontrada.
+            </p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 export const Form = () => {
   const [values, setValues] = useState<FormValues>(initialFormValues);
   const [schedule, setSchedule] = useState<WeeklySchedule>(
@@ -433,7 +567,58 @@ export const Form = () => {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [ufs, setUfs] = useState<IbgeState[]>([]);
+  const [citiesByState, setCitiesByState] = useState<
+    Record<string, IbgeCity[]>
+  >({});
+  const [loadingCitiesByState, setLoadingCitiesByState] = useState<
+    Record<string, boolean>
+  >({});
+  const [serviceCities, setServiceCities] = useState<ServiceCity[]>([
+    initialServiceCity(),
+  ]);
+  const [isServiceLocationModalOpen, setIsServiceLocationModalOpen] =
+    useState(false);
+  const [isServiceLocationModalRendered, setIsServiceLocationModalRendered] =
+    useState(false);
+  const [isServiceLocationModalClosing, setIsServiceLocationModalClosing] =
+    useState(false);
+  const [hasNoFixedLocation, setHasNoFixedLocation] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const scheduleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  useEffect(() => {
+    fetch(
+      "https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome",
+    )
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Falha ao buscar estados.");
+        }
+
+        return response.json() as Promise<IbgeState[]>;
+      })
+      .then(setUfs)
+      .catch(() => setServerError("Não foi possível carregar os estados."));
+  }, []);
+
+  useEffect(() => {
+    if (isServiceLocationModalOpen) {
+      return;
+    }
+
+    if (!isServiceLocationModalRendered) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIsServiceLocationModalRendered(false);
+      setIsServiceLocationModalClosing(false);
+    }, LOCATION_MODAL_EXIT_DURATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isServiceLocationModalOpen, isServiceLocationModalRendered]);
 
   const stepTitles = [
     "Dados principais",
@@ -463,6 +648,128 @@ export const Form = () => {
     });
     setServerError(null);
     setSuccessMessage(null);
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setIsLocating(true);
+    setLocationError(null);
+
+    try {
+      const label = await getCurrentLocationLabel();
+      setValues((prev) => ({ ...prev, localizacao: label }));
+      setErrors((prev) => {
+        const nextErrors = { ...prev };
+        delete nextErrors.localizacao;
+        return nextErrors;
+      });
+    } catch (error) {
+      setLocationError(getGeolocationErrorMessage(error));
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const handleFixedLocationToggle = (checked: boolean) => {
+    setHasNoFixedLocation(checked);
+    setLocationError(null);
+    setErrors((prev) => {
+      const nextErrors = { ...prev };
+      delete nextErrors.localizacao;
+      return nextErrors;
+    });
+
+    if (checked) {
+      setValues((prev) => ({ ...prev, localizacao: "" }));
+      openServiceLocationModal();
+    }
+  };
+
+  const openServiceLocationModal = () => {
+    setIsServiceLocationModalRendered(true);
+    setIsServiceLocationModalClosing(false);
+    setIsServiceLocationModalOpen(true);
+  };
+
+  const closeServiceLocationModal = () => {
+    setIsServiceLocationModalClosing(true);
+    setIsServiceLocationModalOpen(false);
+  };
+
+  const handleServiceCityChange = async (
+    index: number,
+    field: keyof ServiceCity,
+    value: string,
+  ) => {
+    setServiceCities((prev) =>
+      prev.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              [field]: value,
+              ...(field === "state" ? { city: "" } : {}),
+            }
+          : item,
+      ),
+    );
+
+    if (field !== "state" || !value || citiesByState[value]) {
+      return;
+    }
+
+    setLoadingCitiesByState((prev) => ({ ...prev, [value]: true }));
+
+    try {
+      const response = await fetch(
+        `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${value}/municipios`,
+      );
+
+      if (!response.ok) {
+        throw new Error("Falha ao buscar cidades.");
+      }
+
+      const cities = (await response.json()) as IbgeCity[];
+      setCitiesByState((prev) => ({ ...prev, [value]: cities }));
+    } catch {
+      setServerError("Não foi possível carregar as cidades desse estado.");
+    } finally {
+      setLoadingCitiesByState((prev) => ({ ...prev, [value]: false }));
+    }
+  };
+
+  const handleSaveServiceCities = () => {
+    const validCities = serviceCities.filter((item) => item.state && item.city);
+
+    if (!validCities.length || validCities.length !== serviceCities.length) {
+      setServerError("Selecione o estado e a cidade de cada atendimento.");
+      return;
+    }
+
+    const locationLabel = validCities
+      .map((item) => `${item.city} - ${item.state}`)
+      .join(", ");
+    setValues((prev) => ({
+      ...prev,
+      localizacao: `Atendimento em: ${locationLabel}`,
+    }));
+    setErrors((prev) => {
+      const nextErrors = { ...prev };
+      delete nextErrors.localizacao;
+      return nextErrors;
+    });
+    setServerError(null);
+    closeServiceLocationModal();
+  };
+
+  const handleAddServiceCity = () => {
+    setServiceCities((prev) => [...prev, initialServiceCity()]);
+  };
+
+  const handleRemoveServiceCity = (index: number) => {
+    setServiceCities((prev) =>
+      prev.length === 1
+        ? [initialServiceCity()]
+        : prev.filter((_, itemIndex) => itemIndex !== index),
+    );
   };
 
   const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -704,8 +1011,14 @@ export const Form = () => {
       } else if (!validateEmail(formValues.email)) {
         newErrors.email = "E-mail inválido";
       }
-      if (!formValues.localizacao.trim()) {
+      if (!hasNoFixedLocation && !formValues.localizacao.trim()) {
         newErrors.localizacao = "Localização é obrigatória";
+      }
+      if (
+        hasNoFixedLocation &&
+        !serviceCities.every((item) => item.state && item.city)
+      ) {
+        newErrors.localizacao = "Informe as cidades de atendimento";
       }
       if (!formValues.cnpj.trim()) {
         newErrors.cnpj = "CNPJ é obrigatório";
@@ -815,6 +1128,9 @@ export const Form = () => {
       setIsScheduleEditorOpen(false);
       setPhotoFile(null);
       setPhotoInputKey((prev) => prev + 1);
+      setHasNoFixedLocation(false);
+      setServiceCities([initialServiceCity()]);
+      setLocationError(null);
       setCurrentStep(1);
     } catch (error: unknown) {
       const message = getApiErrorMessage(error);
@@ -961,7 +1277,7 @@ export const Form = () => {
               {errors.email && <ErrorBadge message={errors.email} />}
             </label>
 
-            <label className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <span className="text-sm font-medium text-slate-700">
                 Localização *
               </span>
@@ -969,14 +1285,90 @@ export const Form = () => {
                 name="localizacao"
                 value={values.localizacao}
                 onChange={handleChange}
-                placeholder="Endereço, bairro ou cidade"
+                disabled={hasNoFixedLocation}
+                placeholder={
+                  hasNoFixedLocation
+                    ? "Use o botão para escolher as cidades"
+                    : "Endereço, bairro ou cidade"
+                }
               />
+              <div className="flex items-center justify-between gap-3">
+                <label className="flex min-w-0 items-start gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={hasNoFixedLocation}
+                    onChange={(event) =>
+                      handleFixedLocationToggle(event.target.checked)
+                    }
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
+                  />
+                  <span>Não possuo local fixo de atendimento</span>
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleUseCurrentLocation}
+                  disabled={isLocating || hasNoFixedLocation}
+                  aria-label={
+                    hasNoFixedLocation
+                      ? "Usar minha localização indisponível enquanto o atendimento sem local fixo estiver ativo"
+                      : "Usar minha localização"
+                  }
+                  title={
+                    hasNoFixedLocation
+                      ? "Desmarque 'Não possuo local fixo de atendimento' para usar sua localização"
+                      : undefined
+                  }
+                  className="shrink-0 px-3 py-1.5 text-xs disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <LocateFixed className="mr-1.5 h-3.5 w-3.5" strokeWidth={2} />
+                  {isLocating ? "Localizando..." : "Usar minha localização"}
+                </Button>
+              </div>
+              {hasNoFixedLocation ? (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                  {serviceCities.some((item) => item.state && item.city) ? (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                        Cidades selecionadas
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {serviceCities
+                          .filter((item) => item.state && item.city)
+                          .map((item) => (
+                            <span
+                              key={`${item.state}-${item.city}`}
+                              className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-emerald-900 shadow-sm ring-1 ring-emerald-200"
+                            >
+                              {item.city} - {item.state}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-emerald-900">
+                      Informe as cidades onde você atende.
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={openServiceLocationModal}
+                    className="mt-3 px-3 py-1.5 text-xs"
+                  >
+                    {serviceCities.some((item) => item.state && item.city)
+                      ? "Alterar cidades de atendimento"
+                      : "Selecionar cidades de atendimento"}
+                  </Button>
+                </div>
+              ) : null}
+              {locationError ? <ErrorBadge message={locationError} /> : null}
               {errors.localizacao && (
                 <ErrorBadge message={errors.localizacao} />
               )}
-            </label>
+            </div>
 
-            <label className="space-y-2">
+            <label className="space-y-2 md:col-span-2">
               <span className="text-sm font-medium text-slate-700">CNPJ *</span>
               <Input
                 name="cnpj"
@@ -1431,6 +1823,134 @@ export const Form = () => {
           )}
         </div>
       </div>
+
+      {isServiceLocationModalRendered ? (
+        <div
+          className={`auth-modal-overlay fixed inset-0 z-60 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
+            isServiceLocationModalClosing
+              ? "auth-modal-overlay-exit"
+              : "auth-modal-overlay-enter"
+          }`}
+          onClick={closeServiceLocationModal}
+        >
+          <div
+            className={`auth-modal-panel flex max-h-[95vh] w-full max-w-2xl flex-col overflow-visible rounded-2xl bg-white shadow-2xl ${
+              isServiceLocationModalClosing
+                ? "auth-modal-panel-exit"
+                : "auth-modal-panel-enter"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Cidades de atendimento
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Escolha um estado e uma cidade para cada local de atendimento.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeServiceLocationModal}
+                className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                aria-label="Fechar seleção de cidades"
+              >
+                <X className="h-5 w-5" strokeWidth={2} />
+              </button>
+            </div>
+
+            <div className="auth-modal-content-enter scrollbar-none overflow-visible px-5 py-4">
+              <div className="space-y-3">
+                {serviceCities.map((serviceCity, index) => {
+                  const cities = citiesByState[serviceCity.state] ?? [];
+
+                  return (
+                    <div
+                      key={`service-city-${index}`}
+                      className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+                    >
+                      <label className="space-y-1">
+                        <span className="text-xs font-semibold text-slate-700">
+                          Estado
+                        </span>
+                        <SearchableSelect
+                          key={`state-${index}-${serviceCity.state}`}
+                          value={serviceCity.state}
+                          onChange={(state) =>
+                            handleServiceCityChange(index, "state", state)
+                          }
+                          placeholder="Digite a UF"
+                          options={ufs.map((state) => ({
+                            value: state.sigla,
+                            label: `${state.nome} (${state.sigla})`,
+                          }))}
+                        />
+                      </label>
+
+                      <label className="space-y-1">
+                        <span className="text-xs font-semibold text-slate-700">
+                          Cidade
+                        </span>
+                        <SearchableSelect
+                          key={`city-${index}-${serviceCity.state}-${serviceCity.city}`}
+                          value={serviceCity.city}
+                          onChange={(city) =>
+                            handleServiceCityChange(index, "city", city)
+                          }
+                          disabled={!serviceCity.state || !cities.length}
+                          placeholder={
+                            loadingCitiesByState[serviceCity.state]
+                              ? "Carregando cidades..."
+                              : serviceCity.state
+                                ? "Digite a cidade"
+                                : "Escolha o estado primeiro"
+                          }
+                          loading={loadingCitiesByState[serviceCity.state]}
+                          options={cities.map((city) => ({
+                            value: city.nome,
+                            label: city.nome,
+                          }))}
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveServiceCity(index)}
+                        className="rounded-lg border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-white"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddServiceCity}
+                className="mt-4 px-3 py-1.5 text-xs"
+              >
+                + Incluir outra cidade
+              </Button>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeServiceLocationModal}
+              >
+                Cancelar
+              </Button>
+              <Button type="button" onClick={handleSaveServiceCities}>
+                Salvar cidades
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 };

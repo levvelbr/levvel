@@ -11,7 +11,7 @@ export const Button = ({
   ...rest
 }: Props) => {
   const base =
-    "inline-flex items-center justify-center rounded-md px-4 py-2 font-medium shadow-sm";
+    "inline-flex items-center justify-center rounded-md px-4 py-2 font-medium shadow-sm disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-inherit";
   const variants: Record<string, string> = {
     primary: "bg-emerald-700 text-white hover:bg-emerald-800",
     outline:

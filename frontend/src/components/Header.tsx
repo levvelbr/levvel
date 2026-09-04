@@ -21,6 +21,7 @@ interface UserAvatarProps {
   name: string;
   photoUrl?: string | null;
   compact?: boolean;
+  isProvider?: boolean;
 }
 
 const ROLE_LABELS: Record<"cliente" | "estabelecimento", string> = {
@@ -37,14 +38,21 @@ const UserMenuHeader = ({ name, role }: UserMenuHeaderProps) => (
   <div className="mb-2 border-b border-slate-100 px-3 pb-2">
     <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
     {role ? (
-      <span className="text-xs font-medium text-emerald-700">
+      <span
+        className={`text-xs font-medium ${role === "estabelecimento" ? "text-blue-700" : "text-emerald-700"}`}
+      >
         {ROLE_LABELS[role]}
       </span>
     ) : null}
   </div>
 );
 
-const UserAvatar = ({ name, photoUrl, compact = false }: UserAvatarProps) => {
+const UserAvatar = ({
+  name,
+  photoUrl,
+  compact = false,
+  isProvider = false,
+}: UserAvatarProps) => {
   const normalizedName = name.trim();
   const initial = normalizedName ? normalizedName.charAt(0).toUpperCase() : "?";
   const [isLoading, setIsLoading] = useState(Boolean(photoUrl));
@@ -59,7 +67,7 @@ const UserAvatar = ({ name, photoUrl, compact = false }: UserAvatarProps) => {
   if (photoUrl && hasPhoto) {
     return (
       <span
-        className={`relative flex ${avatarSize} shrink-0 items-center justify-center overflow-hidden rounded-full border border-emerald-100 bg-emerald-100 text-xs font-bold text-emerald-900`}
+        className={`relative flex ${avatarSize} shrink-0 items-center justify-center overflow-hidden rounded-full border ${isProvider ? "border-blue-100 bg-blue-100 text-blue-900" : "border-emerald-100 bg-emerald-100 text-emerald-900"} text-xs font-bold`}
       >
         <span
           className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
@@ -68,7 +76,7 @@ const UserAvatar = ({ name, photoUrl, compact = false }: UserAvatarProps) => {
           aria-hidden="true"
         >
           <LoaderCircle
-            className="h-4 w-4 animate-spin text-emerald-700"
+            className={`h-4 w-4 animate-spin ${isProvider ? "text-blue-700" : "text-emerald-700"}`}
             strokeWidth={1.8}
           />
         </span>
@@ -93,21 +101,23 @@ const UserAvatar = ({ name, photoUrl, compact = false }: UserAvatarProps) => {
 
   return (
     <span
-      className={`flex ${avatarSize} items-center justify-center rounded-full bg-emerald-200 text-xs font-bold text-emerald-900`}
+      className={`flex ${avatarSize} items-center justify-center rounded-full ${isProvider ? "bg-blue-200 text-blue-900" : "bg-emerald-200 text-emerald-900"} text-xs font-bold`}
     >
       {initial}
     </span>
   );
 };
 
-const BrandLink = () => {
+const BrandLink = ({ isProvider = false }: { isProvider?: boolean }) => {
   return (
     <Link
       to="/"
       className="flex items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-slate-100"
       aria-label="Ir para a página inicial"
     >
-      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-linear-to-br from-emerald-700 to-emerald-500 text-sm font-semibold text-white">
+      <span
+        className={`flex h-8 w-8 items-center justify-center rounded-md bg-linear-to-br ${isProvider ? "from-blue-700 to-blue-500" : "from-emerald-700 to-emerald-500"} text-sm font-semibold text-white`}
+      >
         L
       </span>
       <span className="text-lg font-semibold tracking-tight text-slate-800 hidden lg:block">
@@ -133,6 +143,7 @@ export const Header = ({
 }: HeaderProps) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const isProvider = loggedClientRole === "estabelecimento";
   const isMobileSearchVisible =
     isMobileSearchOpen || (hideMobileSearchToggle && showSearchBar);
 
@@ -163,7 +174,7 @@ export const Header = ({
                 <Menu className="h-6 w-6" strokeWidth={1.5} />
               </button>
 
-              <BrandLink />
+              <BrandLink isProvider={isProvider} />
             </div>
 
             <div />
@@ -175,7 +186,7 @@ export const Header = ({
                     type="button"
                     onClick={() => setIsUserMenuOpen((prev) => !prev)}
                     aria-label={loggedClientName}
-                    className={`flex items-center rounded-md bg-emerald-50 text-sm font-semibold text-emerald-800 ${
+                    className={`flex items-center rounded-md ${isProvider ? "bg-blue-50 text-blue-800" : "bg-emerald-50 text-emerald-800"} text-sm font-semibold ${
                       compactUserProfile ? "gap-0 p-1.5" : "gap-2 px-2 py-2"
                     }`}
                   >
@@ -183,6 +194,7 @@ export const Header = ({
                       name={loggedClientName}
                       photoUrl={loggedClientPhotoUrl}
                       compact={compactUserProfile}
+                      isProvider={isProvider}
                     />
                     <span
                       className={
@@ -283,12 +295,13 @@ export const Header = ({
                     type="button"
                     onClick={() => setIsUserMenuOpen((prev) => !prev)}
                     aria-label={loggedClientName}
-                    className="flex items-center rounded-md bg-emerald-50 p-1.5 text-emerald-800"
+                    className={`flex items-center rounded-md p-1.5 ${isProvider ? "bg-blue-50 text-blue-800" : "bg-emerald-50 text-emerald-800"}`}
                   >
                     <UserAvatar
                       name={loggedClientName}
                       photoUrl={loggedClientPhotoUrl}
                       compact
+                      isProvider={isProvider}
                     />
                   </button>
 
@@ -361,7 +374,7 @@ export const Header = ({
               <Menu className="h-6 w-6" strokeWidth={1.5} />
             </button>
 
-            <BrandLink />
+            <BrandLink isProvider={isProvider} />
           </div>
 
           <div className="hidden md:flex md:justify-center">
@@ -388,11 +401,12 @@ export const Header = ({
                   type="button"
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
                   aria-label={loggedClientName}
-                  className="flex items-center gap-2 rounded-md bg-emerald-50 px-2 py-2 text-sm font-semibold text-emerald-800"
+                  className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold ${isProvider ? "bg-blue-50 text-blue-800" : "bg-emerald-50 text-emerald-800"}`}
                 >
                   <UserAvatar
                     name={loggedClientName}
                     photoUrl={loggedClientPhotoUrl}
+                    isProvider={isProvider}
                   />
                   <span className="max-w-24 truncate sm:max-w-none">
                     {loggedClientName}

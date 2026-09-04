@@ -80,28 +80,48 @@ const PROVIDER_STATUS_COLORS: Record<ProviderBooking["status"], string> = {
 const PROVIDER_STATUS_PRIORITY: Record<ProviderBooking["status"], number> = {
   pendente: 0,
   confirmado: 1,
-  cancelado: 2,
-  em_andamento: 3,
-  recusado: 4,
-  concluido: 5,
+  em_andamento: 2,
+  concluido: 3,
+  cancelado: 0,
+  recusado: 1,
 };
 
 const sortProviderBookings = (bookings: ProviderBooking[]) => {
-  return [...bookings]
-    .sort((a, b) => {
-      const priorityDiff =
-        PROVIDER_STATUS_PRIORITY[a.status] - PROVIDER_STATUS_PRIORITY[b.status];
+  return [...bookings].sort((a, b) => {
+    const priorityDiff =
+      PROVIDER_STATUS_PRIORITY[a.status] - PROVIDER_STATUS_PRIORITY[b.status];
 
-      if (priorityDiff !== 0) {
-        return priorityDiff;
-      }
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
 
-      return (
-        new Date(a.data_hora_inicio).getTime() -
-        new Date(b.data_hora_inicio).getTime()
-      );
-    })
-    .slice(0, 6);
+    return (
+      new Date(b.data_hora_inicio).getTime() -
+      new Date(a.data_hora_inicio).getTime()
+    );
+  });
+};
+
+const isProviderPendingBooking = (booking: ProviderBooking) =>
+  booking.status === "pendente";
+
+const isProviderCancelledBooking = (booking: ProviderBooking) =>
+  booking.status === "cancelado" || booking.status === "recusado";
+
+const getProviderBookingCardColors = (status: ProviderBooking["status"]) => {
+  if (status === "pendente") {
+    return "border-amber-200 bg-amber-50";
+  }
+
+  if (status === "cancelado" || status === "recusado") {
+    return "border-rose-200 bg-rose-50";
+  }
+
+  if (status === "concluido") {
+    return "border-emerald-200 bg-emerald-50";
+  }
+
+  return "border-slate-200 bg-white";
 };
 
 const formatBookingDate = (iso: string) => {
@@ -414,6 +434,110 @@ export const DashboardLayout = ({
     );
   });
 
+  const providerBookingColumns = useMemo(() => {
+    const pending = providerBookings.filter(isProviderPendingBooking);
+    const cancelled = providerBookings.filter(isProviderCancelledBooking);
+    const active = providerBookings.filter(
+      (booking) =>
+        booking.status === "confirmado" || booking.status === "em_andamento",
+    );
+    const completed = providerBookings.filter(
+      (booking) => booking.status === "concluido",
+    );
+
+    return {
+      left: {
+        pending: sortProviderBookings(pending),
+        cancelled: sortProviderBookings(cancelled),
+      },
+      right: {
+        active: sortProviderBookings(active),
+        completed: sortProviderBookings(completed),
+      },
+    };
+  }, [providerBookings]);
+
+  const renderProviderBookingCard = (booking: ProviderBooking) => (
+    <div
+      key={booking.id}
+      className={`rounded-2xl border p-4 ${getProviderBookingCardColors(booking.status)}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-900">
+            {booking.tratamento}
+          </p>
+          <p className="text-sm text-slate-600">
+            {booking.profissional_envolvido}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {formatBookingDate(booking.data_hora_inicio)}
+          </p>
+        </div>
+
+        <div className="flex flex-col items-end gap-2">
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${PROVIDER_STATUS_COLORS[booking.status]}`}
+          >
+            {PROVIDER_STATUS_LABELS[booking.status]}
+          </span>
+
+          {booking.status === "pendente" ? (
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={providerStatusUpdating === booking.id}
+                onClick={() =>
+                  handleProviderBookingStatusUpdate(booking.id, "recusado")
+                }
+                aria-label="Recusar agendamento"
+                title="Recusar agendamento"
+                className="flex h-9 w-9 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+              >
+                <X className="h-3.5 w-3.5" strokeWidth={2} />
+              </button>
+              <button
+                type="button"
+                disabled={providerStatusUpdating === booking.id}
+                onClick={() =>
+                  handleProviderBookingStatusUpdate(booking.id, "confirmado")
+                }
+                aria-label="Confirmar agendamento"
+                title="Confirmar agendamento"
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-700 text-white hover:bg-emerald-800 disabled:opacity-60"
+              >
+                <Check className="h-3.5 w-3.5" strokeWidth={2} />
+              </button>
+            </div>
+          ) : booking.status === "confirmado" ? (
+            <button
+              type="button"
+              disabled={providerStatusUpdating === booking.id}
+              onClick={() =>
+                handleProviderBookingStatusUpdate(booking.id, "em_andamento")
+              }
+              className="flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+            >
+              <Play className="h-3.5 w-3.5" strokeWidth={2} />
+              Iniciar atendimento
+            </button>
+          ) : booking.status === "em_andamento" ? (
+            <button
+              type="button"
+              disabled={providerStatusUpdating === booking.id}
+              onClick={() => handleProviderBookingFinalize(booking.id)}
+              className="rounded-md bg-sky-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-800 disabled:opacity-60"
+            >
+              {providerStatusUpdating === booking.id
+                ? "Finalizando..."
+                : "Finalizar"}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Passamos a função de abrir para o Header */}
@@ -471,13 +595,13 @@ export const DashboardLayout = ({
       {/* O conteúdo da página */}
       <main className="flex-1">
         {isProviderView ? (
-          <section className="bg-linear-to-b from-emerald-50 to-white px-4 py-10 sm:py-14">
+          <section className="bg-linear-to-b from-blue-50 to-white px-4 py-10 sm:py-14">
             <div className="mx-auto grid w-full max-w-5xl gap-6">
-              <div className="rounded-3xl border border-emerald-200 bg-white p-6 shadow-sm sm:p-8">
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+              <div className="rounded-3xl border border-blue-200 bg-white p-6 shadow-sm sm:p-8">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
                   Painel do Prestador
                 </p>
-                <h1 className="mt-2 text-3xl font-semibold text-emerald-900 sm:text-4xl">
+                <h1 className="mt-2 text-3xl font-semibold text-blue-950 sm:text-4xl">
                   Bem-vindo, {session?.nome}
                 </h1>
                 <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
@@ -488,20 +612,20 @@ export const DashboardLayout = ({
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Link
                     to="/perfil?tab=bookings"
-                    className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
+                    className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
                   >
                     Abrir agenda
                   </Link>
                   <Link
                     to="/perfil"
-                    className="rounded-md border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                    className="rounded-md border border-blue-700 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
                   >
                     Ver meu perfil
                   </Link>
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="hidden gap-4 sm:grid-cols-2">
                 <Link
                   to="/perfil?tab=bookings"
                   className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
@@ -552,103 +676,78 @@ export const DashboardLayout = ({
                     Nenhum agendamento encontrado no momento.
                   </p>
                 ) : (
-                  <div className="grid gap-3">
-                    {providerBookings.map((booking) => (
-                      <div
-                        key={booking.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-900">
-                              {booking.tratamento}
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-4">
+                      <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                        <h3 className="text-sm font-semibold text-amber-900">
+                          Pendentes de aprovação
+                        </h3>
+                        <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                          {providerBookingColumns.left.pending.length ? (
+                            providerBookingColumns.left.pending.map(
+                              renderProviderBookingCard,
+                            )
+                          ) : (
+                            <p className="text-sm text-slate-500">
+                              Nenhum agendamento pendente.
                             </p>
-                            <p className="text-sm text-slate-600">
-                              {booking.profissional_envolvido}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {formatBookingDate(booking.data_hora_inicio)}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-col items-end gap-2">
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${PROVIDER_STATUS_COLORS[booking.status]}`}
-                            >
-                              {PROVIDER_STATUS_LABELS[booking.status]}
-                            </span>
-
-                            {booking.status === "pendente" ? (
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  disabled={
-                                    providerStatusUpdating === booking.id
-                                  }
-                                  onClick={() =>
-                                    handleProviderBookingStatusUpdate(
-                                      booking.id,
-                                      "recusado",
-                                    )
-                                  }
-                                  className="flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
-                                >
-                                  <X className="h-3.5 w-3.5" strokeWidth={2} />
-                                  Recusar
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={
-                                    providerStatusUpdating === booking.id
-                                  }
-                                  onClick={() =>
-                                    handleProviderBookingStatusUpdate(
-                                      booking.id,
-                                      "confirmado",
-                                    )
-                                  }
-                                  className="flex items-center gap-1 rounded-md bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
-                                >
-                                  <Check
-                                    className="h-3.5 w-3.5"
-                                    strokeWidth={2}
-                                  />
-                                  Confirmar
-                                </button>
-                              </div>
-                            ) : booking.status === "confirmado" ? (
-                              <button
-                                type="button"
-                                disabled={providerStatusUpdating === booking.id}
-                                onClick={() =>
-                                  handleProviderBookingStatusUpdate(
-                                    booking.id,
-                                    "em_andamento",
-                                  )
-                                }
-                                className="flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-                              >
-                                <Play className="h-3.5 w-3.5" strokeWidth={2} />
-                                Iniciar atendimento
-                              </button>
-                            ) : booking.status === "em_andamento" ? (
-                              <button
-                                type="button"
-                                disabled={providerStatusUpdating === booking.id}
-                                onClick={() =>
-                                  handleProviderBookingFinalize(booking.id)
-                                }
-                                className="rounded-md bg-sky-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-800 disabled:opacity-60"
-                              >
-                                {providerStatusUpdating === booking.id
-                                  ? "Finalizando..."
-                                  : "Finalizar"}
-                              </button>
-                            ) : null}
-                          </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      </section>
+
+                      <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                        <h3 className="text-sm font-semibold text-rose-900">
+                          Cancelados
+                        </h3>
+                        <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                          {providerBookingColumns.left.cancelled.length ? (
+                            providerBookingColumns.left.cancelled.map(
+                              renderProviderBookingCard,
+                            )
+                          ) : (
+                            <p className="text-sm text-slate-500">
+                              Nenhum agendamento cancelado.
+                            </p>
+                          )}
+                        </div>
+                      </section>
+                    </div>
+
+                    <div className="space-y-4">
+                      <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                        <h3 className="text-sm font-semibold text-sky-900">
+                          A serem realizados
+                        </h3>
+                        <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                          {providerBookingColumns.right.active.length ? (
+                            providerBookingColumns.right.active.map(
+                              renderProviderBookingCard,
+                            )
+                          ) : (
+                            <p className="text-sm text-slate-500">
+                              Nenhum agendamento a realizar.
+                            </p>
+                          )}
+                        </div>
+                      </section>
+
+                      <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                        <h3 className="text-sm font-semibold text-emerald-900">
+                          Concluídos
+                        </h3>
+                        <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                          {providerBookingColumns.right.completed.length ? (
+                            providerBookingColumns.right.completed.map(
+                              renderProviderBookingCard,
+                            )
+                          ) : (
+                            <p className="text-sm text-slate-500">
+                              Nenhum agendamento concluído.
+                            </p>
+                          )}
+                        </div>
+                      </section>
+                    </div>
                   </div>
                 )}
               </div>

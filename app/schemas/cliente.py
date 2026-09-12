@@ -36,7 +36,7 @@ class ClienteBase(BaseModel):
 class ClienteCreate(ClienteBase):
     email: EmailStr = Field(..., description="Email do cliente para login e comunicação")
     senha: str = Field(..., min_length=6, description="Senha para login do cliente")
-    termos_aceitos: bool = Field(..., description="Confirmação de que o usuário aceitou os termos de uso e política de privacidade")
+    aceitou_termos: bool = Field(..., description="Confirmação de que o usuário aceitou os termos de uso e política de privacidade")
     
 class ClienteUpdate(BaseModel):
     nome_tratamento: Optional[str] = Field(None, description="Como o cliente prefere ser chamado")

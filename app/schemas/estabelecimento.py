@@ -105,7 +105,7 @@ class EstabelecimentoCreate(EstabelecimentoBase):
         description="Senha para login do estabelecimento"
     )
 
-    termos_aceitos: bool = Field(
+    aceitou_termos: bool = Field(
         ...,
         description=(
             "Confirmação de que o usuário aceitou os termos de uso "

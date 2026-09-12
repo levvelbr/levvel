@@ -59,7 +59,7 @@ async def login(payload: LoginSchema):
                     email_ou_cpf=cli["cpf"] or cli["email"],
                     access_token=token_real,
                     foto_perfil_url=cli.get("foto_perfil_url"),
-                    aceite_termos=cli.get("termos_aceitos", False)
+                    aceite_termos=cli.get("aceitou_termos", False)
                 )
 
         # 3. Não encontrou em nenhuma tabela

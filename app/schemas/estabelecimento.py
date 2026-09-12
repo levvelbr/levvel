@@ -33,15 +33,10 @@ class EstabelecimentoBase(BaseModel):
     email: EmailStr
     localizacao: str
 
-    foto_estabelecimento_url: Optional[str] = Field(
-        None,
-        description="URL pública da foto do estabelecimento"
-    )
+    foto_estabelecimento_url: Optional[str] = None
 
-    # Tipo do estabelecimento
     tipo_pessoa: Literal["juridica", "autonomo"] = "juridica"
 
-    # Documentos
     cpf: Optional[str] = None
     cnpj: Optional[str] = None
 
@@ -49,53 +44,14 @@ class EstabelecimentoBase(BaseModel):
     categoria: str = "Geral"
     instagram: Optional[str] = None
 
-    servicos_oferecidos: List[str] = []
-    tecnicas_utilizadas: List[str] = []
-    produtos_aplicados: List[str] = []
-    profissionais_envolvidos: List[str] = []
+    servicos_oferecidos: List[str] = Field(default_factory=list)
+    tecnicas_utilizadas: List[str] = Field(default_factory=list)
+    produtos_aplicados: List[str] = Field(default_factory=list)
+    profissionais_envolvidos: List[str] = Field(default_factory=list)
 
-    horario_funcionamento: Dict[str, Any] = {}
-
-    @field_validator("cpf", "cnpj", mode="before")
-    @classmethod
-    def limpar_documentos(cls, valor):
-        if valor is None:
-            return None
-
-        if isinstance(valor, str):
-            valor = "".join(filter(str.isalnum, valor))
-
-            if not valor:
-                return None
-
-        return valor
-
-    @model_validator(mode="after")
-    def validar_tipo_documento(self):
-
-        if self.tipo_pessoa == "autonomo":
-            if not self.cpf:
-                raise ValueError(
-                    "CPF é obrigatório para estabelecimento autônomo."
-                )
-
-            if self.cnpj:
-                raise ValueError(
-                    "Estabelecimento autônomo não deve informar CNPJ."
-                )
-
-        elif self.tipo_pessoa == "juridica":
-            if not self.cnpj:
-                raise ValueError(
-                    "CNPJ é obrigatório para pessoa jurídica."
-                )
-
-            if self.cpf:
-                raise ValueError(
-                    "Pessoa jurídica não deve informar CPF."
-                )
-
-        return self
+    horario_funcionamento: Dict[str, Any] = Field(
+        default_factory=dict
+    )
 
 
 class EstabelecimentoCreate(EstabelecimentoBase):
@@ -107,11 +63,37 @@ class EstabelecimentoCreate(EstabelecimentoBase):
 
     aceitou_termos: bool = Field(
         ...,
-        description=(
-            "Confirmação de que o usuário aceitou os termos de uso "
-            "e política de privacidade"
-        )
+        description="Confirmação de aceite dos termos"
     )
+
+    @model_validator(mode="after")
+    def validar_tipo_documento(self):
+
+        if self.tipo_pessoa == "autonomo":
+
+            if not self.cpf:
+                raise ValueError(
+                    "CPF é obrigatório para estabelecimento autônomo."
+                )
+
+            if self.cnpj:
+                raise ValueError(
+                    "Estabelecimento autônomo não deve informar CNPJ."
+                )
+
+        elif self.tipo_pessoa == "juridica":
+
+            if not self.cnpj:
+                raise ValueError(
+                    "CNPJ é obrigatório para pessoa jurídica."
+                )
+
+            if self.cpf:
+                raise ValueError(
+                    "Pessoa jurídica não deve informar CPF."
+                )
+
+        return self
 
 
 class EstabelecimentoUpdate(BaseModel):

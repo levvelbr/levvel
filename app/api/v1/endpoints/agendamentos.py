@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, logger, status, Query
-from ultralytics import settings
 from app.api.v1.endpoints.google_calendar import criar_agendamento
 from app.schemas.agendamento import (
     AgendamentoCreate, 
@@ -7,7 +6,7 @@ from app.schemas.agendamento import (
     AgendamentoStatusUpdate, 
     AvaliacaoEncerramento
 )
-from app.core.config import supabase_client
+from app.core.config import supabase_client, settings
 from postgrest.exceptions import APIError
 from typing import List, Optional
 

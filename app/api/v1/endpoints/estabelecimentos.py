@@ -11,36 +11,109 @@ from app.core.security import gerar_hash_senha, get_usuario_logado
 
 router = APIRouter()
 
-@router.post("/", response_model=EstabelecimentoResponse, status_code=status.HTTP_201_CREATED)
-async def cadastrar_estabelecimento(estabelecimento: EstabelecimentoCreate):
+@router.post(
+    "/",
+    response_model=EstabelecimentoResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def cadastrar_estabelecimento(
+    estabelecimento: EstabelecimentoCreate
+):
     """
-    Cadastra um novo estabelecimento ou profissional autônomo no ecossistema Levvel.
+    Cadastra um novo estabelecimento ou profissional autônomo
+    no ecossistema Levvel.
     """
     try:
-        dados_estabelecimento = estabelecimento.model_dump()
-        
-        # Gera o hash da senha
-        dados_estabelecimento["senha_hash"] = gerar_hash_senha(dados_estabelecimento["senha_hash"])
-        
-        # Insere os dados na tabela 'estabelecimentos' do Supabase
-        resposta = supabase_client.table("estabelecimentos").insert(dados_estabelecimento).execute()
-        
+        dados_estabelecimento = estabelecimento.model_dump(
+            mode="json"
+        )
+
+        # Verifica documento já cadastrado
+        if estabelecimento.tipo_pessoa == "autonomo":
+
+            cpf_existente = (
+                supabase_client
+                .table("estabelecimentos")
+                .select("id")
+                .eq("cpf", estabelecimento.cpf)
+                .execute()
+            )
+
+            if cpf_existente.data:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Já existe um estabelecimento cadastrado com este CPF."
+                )
+
+            # Garante que autônomo não salve CNPJ
+            dados_estabelecimento["cnpj"] = None
+
+        elif estabelecimento.tipo_pessoa == "juridica":
+
+            cnpj_existente = (
+                supabase_client
+                .table("estabelecimentos")
+                .select("id")
+                .eq("cnpj", estabelecimento.cnpj)
+                .execute()
+            )
+
+            if cnpj_existente.data:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Já existe um estabelecimento cadastrado com este CNPJ."
+                )
+
+            # Garante que empresa não salve CPF
+            dados_estabelecimento["cpf"] = None
+
+        # Verifica e-mail duplicado
+        email_existente = (
+            supabase_client
+            .table("estabelecimentos")
+            .select("id")
+            .eq("email", estabelecimento.email)
+            .execute()
+        )
+
+        if email_existente.data:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Já existe um estabelecimento cadastrado com este e-mail."
+            )
+
+        # Gera hash da senha
+        dados_estabelecimento["senha_hash"] = gerar_hash_senha(
+            dados_estabelecimento["senha_hash"]
+        )
+
+        # Insere no Supabase
+        resposta = (
+            supabase_client
+            .table("estabelecimentos")
+            .insert(dados_estabelecimento)
+            .execute()
+        )
+
         if not resposta.data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Erro ao inserir o estabelecimento no banco de dados."
             )
-            
+
         return resposta.data[0]
-        
+
+    except HTTPException:
+        raise
+
     except APIError as error:
-        # Tratamento do erro Postgres 23505 (Unique Violation) -> E-mail ou CNPJ já cadastrado
+
         if error.code == "23505":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Já existe um estabelecimento cadastrado com este e-mail ou CNPJ."
+                detail="Já existe um cadastro utilizando estes dados."
             )
-            
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Erro no Supabase: {error.message}"

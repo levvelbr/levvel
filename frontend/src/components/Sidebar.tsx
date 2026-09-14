@@ -105,7 +105,11 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
           {isAuthenticated ? (
             <>
               <Link
-                to="/perfil"
+                to={
+                  session?.role === "estabelecimento"
+                    ? "/?providerTab=profile"
+                    : "/perfil"
+                }
                 onClick={onClose}
                 className={getNavigationClassName(
                   location.pathname === "/perfil" && !isBookingsPage,

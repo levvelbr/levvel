@@ -9,6 +9,7 @@ import { ArrowLeft, ChevronDown, LocateFixed, X } from "lucide-react";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
+import type { UserSession } from "../types/auth";
 import { getDocumentDigits, maskCnpj, maskPhone } from "../utils/documentMasks";
 import { getApiErrorMessage } from "../utils/apiErrors";
 import {
@@ -84,6 +85,10 @@ interface ScheduleValidationResult {
 interface DayErrorBadge {
   hasError: boolean;
   message: string | null;
+}
+
+interface FormProps {
+  onLoginSuccess: (session: UserSession) => void;
 }
 
 type WeeklySchedule = Record<WeekDayKey, DaySchedule>;
@@ -401,6 +406,33 @@ const buildSchedulePayload = (schedule: WeeklySchedule) =>
     {} as Record<string, string>,
   );
 
+const parseUserSession = (
+  data: Partial<UserSession> | undefined,
+): UserSession => {
+  if (
+    !data ||
+    typeof data.id !== "string" ||
+    typeof data.role !== "string" ||
+    typeof data.nome !== "string" ||
+    typeof data.email_ou_cpf !== "string" ||
+    typeof data.access_token !== "string"
+  ) {
+    throw new Error("Resposta de autenticacao invalida.");
+  }
+
+  return {
+    id: data.id,
+    role: data.role,
+    nome: data.nome,
+    email_ou_cpf: data.email_ou_cpf,
+    access_token: data.access_token,
+    token_type:
+      typeof data.token_type === "string" ? data.token_type : "bearer",
+    foto_perfil_url:
+      typeof data.foto_perfil_url === "string" ? data.foto_perfil_url : null,
+  };
+};
+
 const initialFormValues: FormValues = {
   nome_estabelecimento: "",
   responsavel: "",
@@ -548,7 +580,7 @@ const SearchableSelect = ({
   );
 };
 
-export const Form = () => {
+export const Form = ({ onLoginSuccess }: FormProps) => {
   const [values, setValues] = useState<FormValues>(initialFormValues);
   const [schedule, setSchedule] = useState<WeeklySchedule>(
     createInitialSchedule(),
@@ -1112,16 +1144,28 @@ export const Form = () => {
       profissionais_envolvidos: parseCsv(values.profissionais_envolvidos),
       horario_funcionamento: buildSchedulePayload(schedule),
       senha_hash: values.senha_hash,
-      termos_aceitos: values.termos_aceitos,
+      aceitou_termos: values.termos_aceitos,
     };
 
     setIsSubmitting(true);
     setServerError(null);
     setSuccessMessage(null);
+    let establishmentCreated = false;
 
     try {
       await api.post("/v1/estabelecimentos/", body);
-      setSuccessMessage("Estabelecimento cadastrado com sucesso.");
+      establishmentCreated = true;
+
+      const loginResponse = await api.post("/v1/auth/login", {
+        identificador: getDocumentDigits(values.cnpj, 14),
+        senha: values.senha_hash,
+        role: "estabelecimento",
+      });
+
+      const session = parseUserSession(
+        loginResponse.data as Partial<UserSession> | undefined,
+      );
+
       setValues(initialFormValues);
       setSchedule(createInitialSchedule());
       setDraftSchedule(createInitialSchedule());
@@ -1132,9 +1176,14 @@ export const Form = () => {
       setServiceCities([initialServiceCity()]);
       setLocationError(null);
       setCurrentStep(1);
+      onLoginSuccess(session);
     } catch (error: unknown) {
       const message = getApiErrorMessage(error);
-      setServerError(`Falha ao cadastrar estabelecimento: ${message}`);
+      setServerError(
+        establishmentCreated
+          ? `Estabelecimento cadastrado, mas houve falha no login automatico: ${message}`
+          : `Falha ao cadastrar estabelecimento: ${message}`,
+      );
     } finally {
       setIsSubmitting(false);
     }

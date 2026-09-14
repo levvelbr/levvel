@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+import type { UserSession } from "../types/auth";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useEscapeKey } from "../hooks/useEscapeKey";
 import { Form } from "./Form";
@@ -10,12 +11,14 @@ interface EstablishmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenLogin: () => void;
+  onLoginSuccess: (session: UserSession) => void;
 }
 
 export const EstablishmentModal = ({
   isOpen,
   onClose,
   onOpenLogin,
+  onLoginSuccess,
 }: EstablishmentModalProps) => {
   const [isRendered, setIsRendered] = useState(isOpen);
   const [isClosing, setIsClosing] = useState(false);
@@ -96,7 +99,12 @@ export const EstablishmentModal = ({
         </div>
 
         <div className="scrollbar-none overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6">
-          <Form />
+          <Form
+            onLoginSuccess={(session) => {
+              onLoginSuccess(session);
+              onClose();
+            }}
+          />
         </div>
       </div>
     </div>

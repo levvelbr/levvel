@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { AuthModal } from "../components/AuthModal";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
+import { EstablishmentNavigation } from "../components/EstablishmentNavigation";
 import api from "../services/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -85,6 +86,15 @@ const STATUS_COLORS: Record<Agendamento["status"], string> = {
   cancelado: "bg-slate-100 text-slate-400",
 };
 
+const PROVIDER_STATUS_COLORS: Record<Agendamento["status"], string> = {
+  pendente: "bg-amber-100 text-amber-800",
+  confirmado: "bg-blue-100 text-blue-800",
+  recusado: "bg-rose-100 text-rose-700",
+  em_andamento: "bg-sky-100 text-sky-800",
+  concluido: "bg-slate-100 text-slate-700",
+  cancelado: "bg-slate-100 text-slate-400",
+};
+
 const PAYMENT_LABELS: Record<string, string> = {
   dinheiro: "Dinheiro",
   cartao_debito: "Cartão de débito",
@@ -108,15 +118,29 @@ const sectionClass = "rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-6";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export const ProfilePage = () => {
+interface ProfilePageProps {
+  embedded?: boolean;
+  initialTab?: "profile" | "bookings";
+}
+
+export const ProfilePage = ({
+  embedded = false,
+  initialTab,
+}: ProfilePageProps) => {
   const { session, logout, updateSession } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const isEstablishment = session?.role === "estabelecimento";
+  const accentButton = isEstablishment
+    ? "bg-blue-700 hover:bg-blue-800"
+    : "bg-emerald-700 hover:bg-emerald-800";
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"profile" | "bookings">(() =>
-    searchParams.get("tab") === "bookings" ? "bookings" : "profile",
+  const [activeTab, setActiveTab] = useState<"profile" | "bookings">(
+    () =>
+      initialTab ??
+      (searchParams.get("tab") === "bookings" ? "bookings" : "profile"),
   );
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [photoUploadLoading, setPhotoUploadLoading] = useState(false);
@@ -193,9 +217,14 @@ export const ProfilePage = () => {
   }, [session?.id, session?.role, updateSession]);
 
   useEffect(() => {
+    if (embedded && initialTab) {
+      setActiveTab(initialTab);
+      return;
+    }
+
     const tab = searchParams.get("tab") === "bookings" ? "bookings" : "profile";
     setActiveTab(tab);
-  }, [searchParams]);
+  }, [embedded, initialTab, searchParams]);
 
   useEffect(() => {
     if (!session || activeTab !== "bookings") return;
@@ -377,67 +406,84 @@ export const ProfilePage = () => {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
-      <Header
-        onOpenMenu={() => setIsSidebarOpen(true)}
-        loggedClientName={session.nome}
-        loggedClientPhotoUrl={session.foto_perfil_url ?? null}
-        onOpenLogin={() => setIsAuthModalOpen(true)}
-        onLogout={() => {
-          logout();
-          navigate("/");
-        }}
-      />
+    <div
+      className={
+        embedded ? "bg-transparent" : "flex min-h-screen flex-col bg-slate-50"
+      }
+    >
+      {!embedded ? (
+        <Header
+          onOpenMenu={() => setIsSidebarOpen(true)}
+          loggedClientName={session.nome}
+          loggedClientPhotoUrl={session.foto_perfil_url ?? null}
+          onOpenLogin={() => setIsAuthModalOpen(true)}
+          onLogout={() => {
+            logout();
+            navigate("/");
+          }}
+        />
+      ) : null}
 
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onAuthChange={() => setIsAuthModalOpen(false)}
-      />
+      {!embedded ? (
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthChange={() => setIsAuthModalOpen(false)}
+        />
+      ) : null}
 
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        onOpenLogin={() => setIsAuthModalOpen(true)}
-      />
+      {!embedded ? (
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          onOpenLogin={() => setIsAuthModalOpen(true)}
+        />
+      ) : null}
 
-      <main className="flex-1 px-4 py-8 sm:px-6">
+      <main className={embedded ? "px-0 py-0" : "flex-1 px-4 py-8 sm:px-6"}>
         <div className="mx-auto max-w-4xl space-y-6">
           {/* Tabs */}
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              to="/"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
-              aria-label="Voltar para a home"
-            >
-              <Home className="h-5 w-5" strokeWidth={1.8} />
-            </Link>
+          {!embedded ? (
+            <div className="flex flex-wrap items-center gap-3">
+              {isEstablishment ? <EstablishmentNavigation /> : null}
 
-            <div className="flex w-fit gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
-              <button
-                type="button"
-                onClick={() => handleChangeTab("profile")}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                  activeTab === "profile"
-                    ? "bg-emerald-700 text-white"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                Meu perfil
-              </button>
-              <button
-                type="button"
-                onClick={() => handleChangeTab("bookings")}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                  activeTab === "bookings"
-                    ? "bg-emerald-700 text-white"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {session.role === "cliente" ? "Meus agendamentos" : "Agenda"}
-              </button>
+              {!isEstablishment ? (
+                <div className="flex w-fit gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+                  <Link
+                    to="/"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+                    aria-label="Voltar para a home"
+                  >
+                    <Home className="h-5 w-5" strokeWidth={1.8} />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => handleChangeTab("profile")}
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                      activeTab === "profile"
+                        ? "bg-emerald-700 text-white"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    Meu perfil
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleChangeTab("bookings")}
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                      activeTab === "bookings"
+                        ? "bg-emerald-700 text-white"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {session.role === "cliente"
+                      ? "Meus agendamentos"
+                      : "Agenda"}
+                  </button>
+                </div>
+              ) : null}
             </div>
-          </div>
+          ) : null}
 
           {/* ── Profile tab ── */}
           {activeTab === "profile" && session.role === "cliente" && (
@@ -749,13 +795,13 @@ export const ProfilePage = () => {
                           setSelectedPhotoFile(file);
                           setPhotoUploadError(null);
                         }}
-                        className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800"
+                        className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-800"
                       />
                       <button
                         type="button"
                         disabled={!selectedPhotoFile || photoUploadLoading}
                         onClick={handlePhotoUpload}
-                        className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                        className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${accentButton} disabled:opacity-60`}
                       >
                         {photoUploadLoading ? "Enviando..." : "Salvar foto"}
                       </button>
@@ -867,7 +913,7 @@ export const ProfilePage = () => {
                         )}
                       </div>
                       <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_COLORS[ag.status]}`}
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${isEstablishment ? PROVIDER_STATUS_COLORS[ag.status] : STATUS_COLORS[ag.status]}`}
                       >
                         {STATUS_LABELS[ag.status]}
                       </span>
@@ -903,7 +949,7 @@ export const ProfilePage = () => {
                               onClick={() =>
                                 handleStatusUpdate(ag.id, "confirmado")
                               }
-                              className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                              className="flex items-center gap-1 rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
                             >
                               <Check className="h-3.5 w-3.5" strokeWidth={2} />
                               Confirmar

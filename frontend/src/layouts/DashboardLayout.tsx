@@ -557,8 +557,6 @@ export const DashboardLayout = ({
         showSearchBar={showHeaderSearch}
         searchQuery={searchQuery}
         onSearch={setSearchQuery}
-        hideMobileSearchToggle={isServicesPage}
-        compactUserProfile={isServicesPage && showHeaderSearch}
       />
 
       <AuthModal
@@ -766,7 +764,7 @@ export const DashboardLayout = ({
         ) : isServicesPage ? (
           <section className="bg-linear-to-b from-emerald-50 via-slate-50 to-white px-4 py-10 sm:py-14">
             <div className="mx-auto w-full max-w-6xl">
-              <div className="mb-8 grid gap-6 border-b border-emerald-100 pb-8 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:items-end">
+              <div className="mb-8 grid gap-6 border-b border-emerald-100 sm:pb-8 pb-2 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:items-end">
                 <div>
                   <p className="text-sm font-semibold text-emerald-700">
                     Catálogo de serviços
@@ -784,7 +782,7 @@ export const DashboardLayout = ({
                   <SearchBar
                     value={searchQuery}
                     onSearch={setSearchQuery}
-                    autoFocusInput
+                    className="sm:block hidden"
                   />
                 </div>
               </div>

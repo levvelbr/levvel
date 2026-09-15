@@ -624,20 +624,6 @@ export const DashboardLayout = ({
                     atualizado. A listagem e busca de estabelecimentos fica
                     oculta no acesso de prestador.
                   </p>
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <Link
-                      to="/?providerTab=agenda"
-                      className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
-                    >
-                      Abrir agenda
-                    </Link>
-                    <Link
-                      to="/?providerTab=profile"
-                      className="rounded-md border border-blue-700 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
-                    >
-                      Ver meu perfil
-                    </Link>
-                  </div>
                 </div>
               ) : null}
 

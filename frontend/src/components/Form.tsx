@@ -10,7 +10,12 @@ import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
 import type { UserSession } from "../types/auth";
-import { getDocumentDigits, maskCnpj, maskPhone } from "../utils/documentMasks";
+import {
+  getDocumentDigits,
+  maskCnpj,
+  maskCpf,
+  maskPhone,
+} from "../utils/documentMasks";
 import { getApiErrorMessage } from "../utils/apiErrors";
 import {
   getCurrentLocationLabel,
@@ -464,6 +469,11 @@ const validateCnpj = (value: string) => {
   return digits.length === 14;
 };
 
+const validateCpf = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+  return digits.length === 11;
+};
+
 const parseCsv = (value: string) =>
   value
     .split(",")
@@ -616,6 +626,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
   const [isServiceLocationModalClosing, setIsServiceLocationModalClosing] =
     useState(false);
   const [hasNoFixedLocation, setHasNoFixedLocation] = useState(false);
+  const [isAutonomo, setIsAutonomo] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const scheduleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -667,7 +678,9 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
     const nextValue =
       name === "cnpj"
-        ? maskCnpj(value)
+        ? isAutonomo
+          ? maskCpf(value)
+          : maskCnpj(value)
         : name === "telefone"
           ? maskPhone(value)
           : value;
@@ -699,6 +712,25 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     } finally {
       setIsLocating(false);
     }
+  };
+
+  const handleAutonomoToggle = (checked: boolean) => {
+    setIsAutonomo(checked);
+    setValues((prev) => ({
+      ...prev,
+      cnpj: "",
+      razao_social: checked ? "" : prev.razao_social,
+    }));
+    setErrors((prev) => {
+      const nextErrors = { ...prev };
+      delete nextErrors.cnpj;
+      if (checked) {
+        delete nextErrors.razao_social;
+      }
+      return nextErrors;
+    });
+    setServerError(null);
+    setSuccessMessage(null);
   };
 
   const handleFixedLocationToggle = (checked: boolean) => {
@@ -1053,11 +1085,19 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
         newErrors.localizacao = "Informe as cidades de atendimento";
       }
       if (!formValues.cnpj.trim()) {
-        newErrors.cnpj = "CNPJ é obrigatório";
-      } else if (!validateCnpj(formValues.cnpj)) {
-        newErrors.cnpj = "CNPJ deve conter 14 dígitos";
+        newErrors.cnpj = isAutonomo
+          ? "CPF é obrigatório"
+          : "CNPJ é obrigatório";
+      } else if (
+        isAutonomo
+          ? !validateCpf(formValues.cnpj)
+          : !validateCnpj(formValues.cnpj)
+      ) {
+        newErrors.cnpj = isAutonomo
+          ? "CPF deve conter 11 dígitos"
+          : "CNPJ deve conter 14 dígitos";
       }
-      if (!formValues.razao_social.trim()) {
+      if (!isAutonomo && !formValues.razao_social.trim()) {
         newErrors.razao_social = "Razão social é obrigatória";
       }
     }
@@ -1134,8 +1174,10 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       email: values.email.trim(),
       localizacao: values.localizacao.trim(),
       foto_estabelecimento_url: null,
-      cnpj: getDocumentDigits(values.cnpj, 14) || null,
-      razao_social: values.razao_social.trim() || null,
+      tipo_pessoa: isAutonomo ? "autonomo" : "juridica",
+      cpf: isAutonomo ? getDocumentDigits(values.cnpj, 11) || null : null,
+      cnpj: isAutonomo ? null : getDocumentDigits(values.cnpj, 14) || null,
+      razao_social: isAutonomo ? null : values.razao_social.trim() || null,
       categoria: values.categoria,
       instagram: values.instagram.trim() || null,
       servicos_oferecidos: parseCsv(values.servicos_oferecidos),
@@ -1157,7 +1199,9 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       establishmentCreated = true;
 
       const loginResponse = await api.post("/v1/auth/login", {
-        identificador: getDocumentDigits(values.cnpj, 14),
+        identificador: isAutonomo
+          ? getDocumentDigits(values.cnpj, 11)
+          : getDocumentDigits(values.cnpj, 14),
         senha: values.senha_hash,
         role: "estabelecimento",
       });
@@ -1173,6 +1217,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       setPhotoFile(null);
       setPhotoInputKey((prev) => prev + 1);
       setHasNoFixedLocation(false);
+      setIsAutonomo(false);
       setServiceCities([initialServiceCity()]);
       setLocationError(null);
       setCurrentStep(1);
@@ -1418,30 +1463,46 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
             </div>
 
             <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">CNPJ *</span>
+              <span className="text-sm font-medium text-slate-700">
+                {isAutonomo ? "CPF *" : "CNPJ *"}
+              </span>
               <Input
                 name="cnpj"
                 value={values.cnpj}
                 onChange={handleChange}
-                placeholder="00.000.000/0000-00"
+                placeholder={
+                  isAutonomo ? "000.000.000-00" : "00.000.000/0000-00"
+                }
               />
               {errors.cnpj && <ErrorBadge message={errors.cnpj} />}
             </label>
 
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">
-                Razão social *
-              </span>
-              <Input
-                name="razao_social"
-                value={values.razao_social}
-                onChange={handleChange}
-                placeholder="Razão social da empresa"
+            <label className="flex items-start gap-2 text-sm text-slate-600 md:col-span-2">
+              <input
+                type="checkbox"
+                checked={isAutonomo}
+                onChange={(event) => handleAutonomoToggle(event.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
               />
-              {errors.razao_social && (
-                <ErrorBadge message={errors.razao_social} />
-              )}
+              <span>Sou autônomo</span>
             </label>
+
+            {!isAutonomo ? (
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">
+                  Razão social *
+                </span>
+                <Input
+                  name="razao_social"
+                  value={values.razao_social}
+                  onChange={handleChange}
+                  placeholder="Razão social da empresa"
+                />
+                {errors.razao_social && (
+                  <ErrorBadge message={errors.razao_social} />
+                )}
+              </label>
+            ) : null}
           </>
         ) : null}
 

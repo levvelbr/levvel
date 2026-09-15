@@ -284,7 +284,7 @@ export const ClientForm = ({
       forma_pagamento_preferida: values.forma_pagamento_preferida,
       localizacao_inicial: values.localizacao_inicial.trim(),
       senha: values.senha,
-      termos_aceitos: values.termos_aceitos,
+      aceitou_termos: values.termos_aceitos,
     };
 
     const trimmedTreatment = values.nome_tratamento.trim();

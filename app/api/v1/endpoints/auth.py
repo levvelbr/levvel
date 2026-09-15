@@ -15,11 +15,11 @@ async def login(payload: LoginSchema):
     identificador = payload.identificador.strip()
 
     try:
-        # 1. Tenta encontrar em Estabelecimentos (por e-mail ou CNPJ)
+        # 1. Tenta encontrar em Estabelecimentos (por e-mail, CNPJ ou CPF)
         if payload.role == UserRole.ESTABELECIMENTO:
             est_query = supabase_client.table("estabelecimentos")\
                 .select("*")\
-                .or_(f"email.eq.{identificador},cnpj.eq.{identificador}")\
+                .or_(f"email.eq.{identificador},cnpj.eq.{identificador}, cpf.eq.{identificador}")\
                 .execute()
 
             if est_query.data:

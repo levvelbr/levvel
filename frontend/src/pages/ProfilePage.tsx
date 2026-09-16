@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Check, Home, X } from "lucide-react";
+import {
+  ArrowDownWideNarrow,
+  ArrowUpWideNarrow,
+  CalendarDays,
+  Check,
+  ClockFading,
+  Contact,
+  Filter,
+  Home,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { AuthModal } from "../components/AuthModal";
 import { Header } from "../components/Header";
@@ -66,6 +77,12 @@ interface Agendamento {
   criado_em: string;
 }
 
+interface ClienteAgenda {
+  id: string;
+  nome_usuario: string;
+  nome_tratamento: string | null;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<Agendamento["status"], string> = {
@@ -112,7 +129,23 @@ const formatDate = (iso: string) =>
   });
 
 const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200";
+  "h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200";
+
+const groupedInputClass =
+  "h-9 w-full border-0 bg-transparent px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-0";
+
+const bookingStatuses: Array<Agendamento["status"]> = [
+  "pendente",
+  "confirmado",
+  "recusado",
+  "em_andamento",
+  "concluido",
+  "cancelado",
+];
+
+const statusOrder = new Map(
+  bookingStatuses.map((status, index) => [status, index]),
+);
 
 const sectionClass = "rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-6";
 
@@ -169,8 +202,26 @@ export const ProfilePage = ({
 
   // ── Agendamentos state ───────────────────────────────────────────────────────
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [clientesAgenda, setClientesAgenda] = useState<
+    Record<string, ClienteAgenda>
+  >({});
   const [agendamentosLoading, setAgendamentosLoading] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
+  const [bookingStatusFilter, setBookingStatusFilter] = useState("");
+  const [bookingProfessionalFilter, setBookingProfessionalFilter] =
+    useState("");
+  const [bookingClientFilter, setBookingClientFilter] = useState("");
+  const [bookingStartDate, setBookingStartDate] = useState("");
+  const [bookingEndDate, setBookingEndDate] = useState("");
+  const [dateSortDirection, setDateSortDirection] = useState<"asc" | "desc">(
+    "desc",
+  );
+  const [statusSortDirection, setStatusSortDirection] = useState<
+    "asc" | "desc"
+  >("asc");
+  const [bookingSortField, setBookingSortField] = useState<"date" | "status">(
+    "date",
+  );
 
   // ── Data fetching ────────────────────────────────────────────────────────────
 
@@ -237,10 +288,103 @@ export const ProfilePage = ({
 
     api
       .get(url)
-      .then((r) => setAgendamentos(r.data as Agendamento[]))
+      .then(async (r) => {
+        const bookings = r.data as Agendamento[];
+        setAgendamentos(bookings);
+
+        if (session.role !== "estabelecimento") return;
+
+        const clientIds = [
+          ...new Set(bookings.map((booking) => booking.cliente_id)),
+        ];
+        const clientEntries = await Promise.all(
+          clientIds.map(async (clientId) => {
+            try {
+              const clientResponse = await api.get(`/v1/clientes/${clientId}`);
+              return [clientId, clientResponse.data as ClienteAgenda] as const;
+            } catch {
+              return null;
+            }
+          }),
+        );
+
+        setClientesAgenda(
+          Object.fromEntries(
+            clientEntries.filter(Boolean) as Array<
+              readonly [string, ClienteAgenda]
+            >,
+          ),
+        );
+      })
       .catch(() => setAgendamentos([]))
       .finally(() => setAgendamentosLoading(false));
   }, [session?.id, session?.role, activeTab]);
+
+  const resetBookingFilters = () => {
+    setBookingStatusFilter("");
+    setBookingProfessionalFilter("");
+    setBookingClientFilter("");
+    setBookingStartDate("");
+    setBookingEndDate("");
+    setDateSortDirection("desc");
+    setStatusSortDirection("asc");
+    setBookingSortField("date");
+  };
+
+  const professionalOptions = [
+    ...new Set(agendamentos.map((booking) => booking.profissional_envolvido)),
+  ].sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  const clientOptions = [
+    ...new Map(
+      agendamentos.map((booking) => {
+        const client = clientesAgenda[booking.cliente_id];
+        return [
+          booking.cliente_id,
+          {
+            id: booking.cliente_id,
+            name:
+              client?.nome_tratamento?.trim() ||
+              client?.nome_usuario ||
+              booking.cliente_id,
+          },
+        ] as const;
+      }),
+    ).values(),
+  ].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+  const filteredAgendamentos = agendamentos
+    .filter((booking) => {
+      const bookingDate = new Date(booking.data_hora_inicio);
+      const startDate = bookingStartDate
+        ? new Date(`${bookingStartDate}T00:00:00`)
+        : null;
+      const endDate = bookingEndDate
+        ? new Date(`${bookingEndDate}T23:59:59.999`)
+        : null;
+
+      return (
+        (!bookingStatusFilter || booking.status === bookingStatusFilter) &&
+        (!bookingProfessionalFilter ||
+          booking.profissional_envolvido === bookingProfessionalFilter) &&
+        (!bookingClientFilter || booking.cliente_id === bookingClientFilter) &&
+        (!startDate || bookingDate >= startDate) &&
+        (!endDate || bookingDate <= endDate)
+      );
+    })
+    .sort((bookingA, bookingB) => {
+      if (bookingSortField === "date") {
+        const difference =
+          new Date(bookingA.data_hora_inicio).getTime() -
+          new Date(bookingB.data_hora_inicio).getTime();
+        return dateSortDirection === "desc" ? -difference : difference;
+      }
+
+      const difference =
+        (statusOrder.get(bookingA.status) ?? 0) -
+        (statusOrder.get(bookingB.status) ?? 0);
+      return statusSortDirection === "desc" ? -difference : difference;
+    });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -880,134 +1024,338 @@ export const ProfilePage = ({
           {/* ── Bookings tab ── */}
           {activeTab === "bookings" && (
             <div className="space-y-4">
-              {agendamentosLoading ? (
-                <div className={sectionClass}>
-                  <p className="text-sm text-slate-500">
-                    Carregando agendamentos...
-                  </p>
-                </div>
-              ) : agendamentos.length === 0 ? (
-                <div className={sectionClass}>
-                  <p className="text-sm text-slate-500">
-                    Nenhum agendamento encontrado.
-                  </p>
-                </div>
-              ) : (
-                agendamentos.map((ag) => (
-                  <div
-                    key={ag.id}
-                    className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-5"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900">
-                          {ag.tratamento}
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          {ag.profissional_envolvido}
-                        </p>
-                        {ag.tecnica && (
-                          <p className="text-sm text-slate-500">
-                            Técnica: {ag.tecnica}
-                          </p>
-                        )}
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${isEstablishment ? PROVIDER_STATUS_COLORS[ag.status] : STATUS_COLORS[ag.status]}`}
-                      >
-                        {STATUS_LABELS[ag.status]}
-                      </span>
+              {isEstablishment && (
+                <div className="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Filter
+                        className="h-4 w-4 text-blue-700"
+                        strokeWidth={2}
+                      />
+                      <h2 className="text-base font-semibold text-slate-900">
+                        Filtros
+                      </h2>
                     </div>
+                    <button
+                      type="button"
+                      onClick={resetBookingFilters}
+                      className="inline-flex items-center gap-2 rounded-lg border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 hover:cursor-pointer"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} />
+                      Limpar filtros
+                    </button>
+                  </div>
+                  <div className="mt-3 grid w-full gap-2 sm:grid-cols-2 lg:grid-cols-[1.5fr_0.8fr_0.8fr_0.7fr]">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                        <span className="w-9 shrink-0" aria-hidden="true" />
+                        <span className="min-w-0 flex-1">De</span>
+                        <span className="min-w-0 flex-1">Até</span>
+                      </div>
+                      <div className="mt-1 flex min-w-0 items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        <button
+                          type="button"
+                          title={`Ordenação por data: ${dateSortDirection === "desc" ? "mais recentes primeiro" : "mais antigas primeiro"}`}
+                          aria-label={`Ordenar por data: ${dateSortDirection === "desc" ? "mais recentes primeiro" : "mais antigas primeiro"}`}
+                          onClick={() => {
+                            setBookingSortField("date");
+                            setDateSortDirection((direction) =>
+                              direction === "desc" ? "asc" : "desc",
+                            );
+                          }}
+                          className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${bookingSortField === "date" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
+                        >
+                          {dateSortDirection === "desc" ? (
+                            <ArrowDownWideNarrow
+                              className="h-4 w-4"
+                              strokeWidth={2}
+                            />
+                          ) : (
+                            <ArrowUpWideNarrow
+                              className="h-4 w-4"
+                              strokeWidth={2}
+                            />
+                          )}
+                        </button>
+                        <input
+                          aria-label="Data inicial"
+                          type="date"
+                          value={bookingStartDate}
+                          onChange={(event) =>
+                            setBookingStartDate(event.target.value)
+                          }
+                          className={`${groupedInputClass} min-w-0 flex-1 border-r border-slate-200`}
+                        />
+                        <input
+                          aria-label="Data final"
+                          type="date"
+                          value={bookingEndDate}
+                          onChange={(event) =>
+                            setBookingEndDate(event.target.value)
+                          }
+                          className={`${groupedInputClass} min-w-0 flex-1`}
+                        />
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold text-slate-600">
+                        Status
+                      </div>
+                      <div className="mt-1 flex min-w-0 items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        <button
+                          type="button"
+                          title={`Ordenação por status: ${statusSortDirection === "asc" ? "menor para maior" : "maior para menor"}`}
+                          aria-label={`Ordenar por status: ${statusSortDirection === "asc" ? "menor para maior" : "maior para menor"}`}
+                          onClick={() => {
+                            setBookingSortField("status");
+                            setStatusSortDirection((direction) =>
+                              direction === "asc" ? "desc" : "asc",
+                            );
+                          }}
+                          className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${bookingSortField === "status" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
+                        >
+                          {statusSortDirection === "asc" ? (
+                            <ArrowDownWideNarrow
+                              className="h-4 w-4"
+                              strokeWidth={2}
+                            />
+                          ) : (
+                            <ArrowUpWideNarrow
+                              className="h-4 w-4"
+                              strokeWidth={2}
+                            />
+                          )}
+                        </button>
+                        <select
+                          value={bookingStatusFilter}
+                          onChange={(event) =>
+                            setBookingStatusFilter(event.target.value)
+                          }
+                          className={`${groupedInputClass} min-w-0 flex-1`}
+                        >
+                          <option value="">Todos os status</option>
+                          {bookingStatuses.map((status) => (
+                            <option key={status} value={status}>
+                              {STATUS_LABELS[status]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold text-slate-600">
+                        Profissional
+                      </div>
+                      <div className="mt-1 flex min-w-0 items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        <select
+                          value={bookingProfessionalFilter}
+                          onChange={(event) =>
+                            setBookingProfessionalFilter(event.target.value)
+                          }
+                          className={`${groupedInputClass} min-w-0 flex-1`}
+                        >
+                          <option value="">Todos os profissionais</option>
+                          {professionalOptions.map((professional) => (
+                            <option key={professional} value={professional}>
+                              {professional}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold text-slate-600">
+                        Cliente
+                      </div>
+                      <div className="mt-1 flex min-w-0 items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        <select
+                          value={bookingClientFilter}
+                          onChange={(event) =>
+                            setBookingClientFilter(event.target.value)
+                          }
+                          className={`${groupedInputClass} min-w-0 flex-1`}
+                        >
+                          <option value="">Todos os clientes</option>
+                          {clientOptions.map((client) => (
+                            <option key={client.id} value={client.id}>
+                              {client.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="mx-auto w-full max-w-3xl space-y-4">
+                {agendamentosLoading ? (
+                  <div className={sectionClass}>
+                    <p className="text-sm text-slate-500">
+                      Carregando agendamentos...
+                    </p>
+                  </div>
+                ) : filteredAgendamentos.length === 0 ? (
+                  <div className={sectionClass}>
+                    <p className="text-sm text-slate-500">
+                      Nenhum agendamento encontrado para os filtros aplicados.
+                    </p>
+                  </div>
+                ) : (
+                  filteredAgendamentos.map((ag) => (
+                    <div
+                      key={ag.id}
+                      className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-5"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-2">
+                          <p className="font-semibold text-slate-900">
+                            {ag.tratamento}
+                          </p>
 
-                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
-                      <span>{formatDate(ag.data_hora_inicio)}</span>
-                      <span>{ag.duracao_estimada_minutos} min</span>
-                      {ag.custo_final > 0 && (
-                        <span>
-                          R${" "}
-                          {ag.custo_final.toLocaleString("pt-BR", {
-                            minimumFractionDigits: 2,
-                          })}
+                          {isEstablishment && (
+                            <div className="flex flex-wrap items-center rounded-2xl gap-2 text-sm">
+                              <span className="text-xs font-medium text-slate-500">
+                                <Contact className="h-5 w-5 text-slate-600" />
+                              </span>
+                              <span className="text-sm font-medium text-slate-700">
+                                {clientesAgenda[
+                                  ag.cliente_id
+                                ]?.nome_tratamento?.trim() ||
+                                  clientesAgenda[ag.cliente_id]?.nome_usuario ||
+                                  "Cliente não identificado"}
+                              </span>
+                            </div>
+                          )}
+
+                          {ag.tecnica && (
+                            <div className="hidden flex-wrap items-center gap-2 text-sm">
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                                Técnica
+                              </span>
+                              <span className="text-slate-500">
+                                {ag.tecnica}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${isEstablishment ? PROVIDER_STATUS_COLORS[ag.status] : STATUS_COLORS[ag.status]}`}
+                        >
+                          {STATUS_LABELS[ag.status]}
                         </span>
+                      </div>
+
+                      <div className="mt-3 flex items-end justify-between gap-3">
+                        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
+                          <span className="flex items-center gap-1">
+                            <CalendarDays className="h-4 w-4 text-slate-600" />
+                            {formatDate(ag.data_hora_inicio)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            {" "}
+                            <ClockFading className="h-4 w-4 text-slate-600" />{" "}
+                            {ag.duracao_estimada_minutos} min
+                          </span>
+                          {ag.custo_final > 0 && (
+                            <span>
+                              R${" "}
+                              {ag.custo_final.toLocaleString("pt-BR", {
+                                minimumFractionDigits: 2,
+                              })}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="ml-auto flex shrink-0 flex-col items-end text-right">
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                            Profissional responsável
+                          </span>
+                          <span className="text-sm font-medium text-slate-700">
+                            {ag.profissional_envolvido}
+                          </span>
+                        </div>
+                      </div>
+
+                      {ag.motivo_recusa && (
+                        <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                          Motivo da recusa: {ag.motivo_recusa}
+                        </p>
+                      )}
+
+                      {/* Establishment status actions */}
+                      {session.role === "estabelecimento" && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {ag.status === "pendente" && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={statusUpdating === ag.id}
+                                onClick={() =>
+                                  handleStatusUpdate(ag.id, "confirmado")
+                                }
+                                className="flex items-center gap-1 rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+                              >
+                                <Check
+                                  className="h-3.5 w-3.5"
+                                  strokeWidth={2}
+                                />
+                                Confirmar
+                              </button>
+                              <button
+                                type="button"
+                                disabled={statusUpdating === ag.id}
+                                onClick={() =>
+                                  handleStatusUpdate(ag.id, "recusado")
+                                }
+                                className="flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                              >
+                                <X className="h-3.5 w-3.5" strokeWidth={2} />
+                                Recusar
+                              </button>
+                            </>
+                          )}
+                          {ag.status === "confirmado" && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={statusUpdating === ag.id}
+                                onClick={() =>
+                                  handleStatusUpdate(ag.id, "em_andamento")
+                                }
+                                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+                              >
+                                Iniciar atendimento
+                              </button>
+                              <button
+                                type="button"
+                                disabled={statusUpdating === ag.id}
+                                onClick={() =>
+                                  handleStatusUpdate(ag.id, "cancelado")
+                                }
+                                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                              >
+                                Cancelar
+                              </button>
+                            </>
+                          )}
+                          {ag.status === "em_andamento" && (
+                            <button
+                              type="button"
+                              disabled={statusUpdating === ag.id}
+                              onClick={() => handleFinalizeBooking(ag.id)}
+                              className="rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800 disabled:opacity-60"
+                            >
+                              {statusUpdating === ag.id
+                                ? "Finalizando..."
+                                : "Finalizar atendimento"}
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
-
-                    {ag.motivo_recusa && (
-                      <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                        Motivo da recusa: {ag.motivo_recusa}
-                      </p>
-                    )}
-
-                    {/* Establishment status actions */}
-                    {session.role === "estabelecimento" && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {ag.status === "pendente" && (
-                          <>
-                            <button
-                              type="button"
-                              disabled={statusUpdating === ag.id}
-                              onClick={() =>
-                                handleStatusUpdate(ag.id, "confirmado")
-                              }
-                              className="flex items-center gap-1 rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
-                            >
-                              <Check className="h-3.5 w-3.5" strokeWidth={2} />
-                              Confirmar
-                            </button>
-                            <button
-                              type="button"
-                              disabled={statusUpdating === ag.id}
-                              onClick={() =>
-                                handleStatusUpdate(ag.id, "recusado")
-                              }
-                              className="flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
-                            >
-                              <X className="h-3.5 w-3.5" strokeWidth={2} />
-                              Recusar
-                            </button>
-                          </>
-                        )}
-                        {ag.status === "confirmado" && (
-                          <>
-                            <button
-                              type="button"
-                              disabled={statusUpdating === ag.id}
-                              onClick={() =>
-                                handleStatusUpdate(ag.id, "em_andamento")
-                              }
-                              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-                            >
-                              Iniciar atendimento
-                            </button>
-                            <button
-                              type="button"
-                              disabled={statusUpdating === ag.id}
-                              onClick={() =>
-                                handleStatusUpdate(ag.id, "cancelado")
-                              }
-                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-                            >
-                              Cancelar
-                            </button>
-                          </>
-                        )}
-                        {ag.status === "em_andamento" && (
-                          <button
-                            type="button"
-                            disabled={statusUpdating === ag.id}
-                            onClick={() => handleFinalizeBooking(ag.id)}
-                            className="rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800 disabled:opacity-60"
-                          >
-                            {statusUpdating === ag.id
-                              ? "Finalizando..."
-                              : "Finalizar atendimento"}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>

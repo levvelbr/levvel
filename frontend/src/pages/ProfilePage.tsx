@@ -112,6 +112,22 @@ const PROVIDER_STATUS_COLORS: Record<Agendamento["status"], string> = {
   cancelado: "bg-slate-100 text-slate-400",
 };
 
+const getProviderBookingCardColors = (status: Agendamento["status"]) => {
+  if (status === "pendente") {
+    return "border-amber-200 bg-amber-50";
+  }
+
+  if (status === "cancelado" || status === "recusado") {
+    return "border-rose-200 bg-rose-50";
+  }
+
+  if (status === "concluido") {
+    return "border-blue-200 bg-blue-50";
+  }
+
+  return "border-slate-200 bg-white";
+};
+
 const PAYMENT_LABELS: Record<string, string> = {
   dinheiro: "Dinheiro",
   cartao_debito: "Cartão de débito",
@@ -146,6 +162,15 @@ const bookingStatuses: Array<Agendamento["status"]> = [
 const statusOrder = new Map(
   bookingStatuses.map((status, index) => [status, index]),
 );
+
+const providerInitialStatusPriority: Record<Agendamento["status"], number> = {
+  pendente: 0,
+  confirmado: 1,
+  recusado: 2,
+  cancelado: 2,
+  em_andamento: 3,
+  concluido: 4,
+};
 
 const sectionClass = "rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-6";
 
@@ -374,6 +399,16 @@ export const ProfilePage = ({
     })
     .sort((bookingA, bookingB) => {
       if (bookingSortField === "date") {
+        if (isEstablishment) {
+          const statusDifference =
+            providerInitialStatusPriority[bookingA.status] -
+            providerInitialStatusPriority[bookingB.status];
+
+          if (statusDifference !== 0) {
+            return statusDifference;
+          }
+        }
+
         const difference =
           new Date(bookingA.data_hora_inicio).getTime() -
           new Date(bookingB.data_hora_inicio).getTime();
@@ -1204,7 +1239,7 @@ export const ProfilePage = ({
                   filteredAgendamentos.map((ag) => (
                     <div
                       key={ag.id}
-                      className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200 p-5"
+                      className={`rounded-3xl border p-5 shadow-sm ${isEstablishment ? getProviderBookingCardColors(ag.status) : "border-slate-200 bg-white"}`}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 space-y-2">

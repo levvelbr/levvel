@@ -22,6 +22,12 @@ import {
   getGeolocationErrorMessage,
 } from "../utils/geolocation";
 
+type MultiValueField =
+  | "servicos_oferecidos"
+  | "tecnicas_utilizadas"
+  | "produtos_aplicados"
+  | "profissionais_envolvidos";
+
 interface FormValues {
   nome_estabelecimento: string;
   responsavel: string;
@@ -474,12 +480,6 @@ const validateCpf = (value: string) => {
   return digits.length === 11;
 };
 
-const parseCsv = (value: string) =>
-  value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-
 const ErrorBadge = ({ message }: { message: string }) => (
   <span className="mt-1 inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
     {message}
@@ -592,6 +592,22 @@ const SearchableSelect = ({
 
 export const Form = ({ onLoginSuccess }: FormProps) => {
   const [values, setValues] = useState<FormValues>(initialFormValues);
+  const [multiValueInputs, setMultiValueInputs] = useState<
+    Record<MultiValueField, string[]>
+  >({
+    servicos_oferecidos: [],
+    tecnicas_utilizadas: [],
+    produtos_aplicados: [],
+    profissionais_envolvidos: [],
+  });
+  const [multiValueDrafts, setMultiValueDrafts] = useState<
+    Record<MultiValueField, string>
+  >({
+    servicos_oferecidos: "",
+    tecnicas_utilizadas: "",
+    produtos_aplicados: "",
+    profissionais_envolvidos: "",
+  });
   const [schedule, setSchedule] = useState<WeeklySchedule>(
     createInitialSchedule(),
   );
@@ -855,6 +871,122 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     setSuccessMessage(null);
   };
 
+  const addMultiValueItem = (field: MultiValueField) => {
+    const value = multiValueDrafts[field].trim();
+
+    if (!value) {
+      return;
+    }
+
+    setMultiValueInputs((prev) => {
+      const currentItems = prev[field];
+      const normalizedValue = value.replace(/\s+/g, " ");
+
+      if (
+        currentItems.some(
+          (item) => item.toLowerCase() === normalizedValue.toLowerCase(),
+        )
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [field]: [...currentItems, normalizedValue],
+      };
+    });
+
+    setMultiValueDrafts((prev) => ({
+      ...prev,
+      [field]: "",
+    }));
+    setErrors((prev) => {
+      const nextErrors = { ...prev };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+    setServerError(null);
+    setSuccessMessage(null);
+  };
+
+  const removeMultiValueItem = (
+    field: MultiValueField,
+    itemToRemove: string,
+  ) => {
+    setMultiValueInputs((prev) => ({
+      ...prev,
+      [field]: prev[field].filter((item) => item !== itemToRemove),
+    }));
+    setErrors((prev) => {
+      const nextErrors = { ...prev };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+  };
+
+  const renderMultiValueField = (
+    field: MultiValueField,
+    label: string,
+    placeholder: string,
+  ) => (
+    <div className="space-y-2 md:col-span-2">
+      <span
+        id={`${field}-label`}
+        className="text-sm font-medium text-slate-700"
+      >
+        {label}
+      </span>
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 focus-within:ring-2 focus-within:ring-emerald-300">
+        {multiValueInputs[field].map((item) => (
+          <button
+            key={`${field}-${item}`}
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => removeMultiValueItem(field, item)}
+            className="group inline-flex shrink-0 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-900 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+            title={`Remover ${item}`}
+          >
+            <span>{item}</span>
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-slate-500 group-hover:text-rose-700">
+              ×
+            </span>
+          </button>
+        ))}
+
+        <div className="flex min-w-40 flex-1 items-center gap-2">
+          <input
+            type="text"
+            aria-labelledby={`${field}-label`}
+            value={multiValueDrafts[field]}
+            onChange={(event) =>
+              setMultiValueDrafts((prev) => ({
+                ...prev,
+                [field]: event.target.value,
+              }))
+            }
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addMultiValueItem(field);
+              }
+            }}
+            placeholder={placeholder}
+            className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => addMultiValueItem(field)}
+            className="shrink-0 px-3 py-1.5 text-xs"
+          >
+            Adicionar
+          </Button>
+        </div>
+      </div>
+      {errors[field] && <ErrorBadge message={errors[field]} />}
+    </div>
+  );
+
   const clearScheduleError = () => {
     setErrors((prev) => {
       if (!prev.horario_funcionamento) {
@@ -1109,7 +1241,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       if (!formValues.instagram.trim()) {
         newErrors.instagram = "Instagram é obrigatório";
       }
-      if (!formValues.profissionais_envolvidos.trim()) {
+      if (!multiValueInputs.profissionais_envolvidos.length) {
         newErrors.profissionais_envolvidos =
           "Profissionais envolvidos são obrigatórios";
       }
@@ -1180,10 +1312,10 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       razao_social: isAutonomo ? null : values.razao_social.trim() || null,
       categoria: values.categoria,
       instagram: values.instagram.trim() || null,
-      servicos_oferecidos: parseCsv(values.servicos_oferecidos),
-      tecnicas_utilizadas: parseCsv(values.tecnicas_utilizadas),
-      produtos_aplicados: parseCsv(values.produtos_aplicados),
-      profissionais_envolvidos: parseCsv(values.profissionais_envolvidos),
+      servicos_oferecidos: multiValueInputs.servicos_oferecidos,
+      tecnicas_utilizadas: multiValueInputs.tecnicas_utilizadas,
+      produtos_aplicados: multiValueInputs.produtos_aplicados,
+      profissionais_envolvidos: multiValueInputs.profissionais_envolvidos,
       horario_funcionamento: buildSchedulePayload(schedule),
       senha_hash: values.senha_hash,
       aceitou_termos: values.termos_aceitos,
@@ -1213,6 +1345,18 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       setValues(initialFormValues);
       setSchedule(createInitialSchedule());
       setDraftSchedule(createInitialSchedule());
+      setMultiValueInputs({
+        servicos_oferecidos: [],
+        tecnicas_utilizadas: [],
+        produtos_aplicados: [],
+        profissionais_envolvidos: [],
+      });
+      setMultiValueDrafts({
+        servicos_oferecidos: "",
+        tecnicas_utilizadas: "",
+        produtos_aplicados: "",
+        profissionais_envolvidos: "",
+      });
       setIsScheduleEditorOpen(false);
       setPhotoFile(null);
       setPhotoInputKey((prev) => prev + 1);
@@ -1331,7 +1475,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                 type="file"
                 accept="image/*"
                 onChange={handlePhotoChange}
-                className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-300"
               />
               {photoFile ? (
                 <span className="text-xs text-slate-500">
@@ -1713,7 +1857,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   name="categoria"
                   value={values.categoria}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 >
                   {categoryOptions.map((category) => (
                     <option key={category} value={category}>
@@ -1725,7 +1869,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
               </label>
 
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-slate-700 ">
                   Instagram *
                 </span>
                 <Input
@@ -1733,68 +1877,34 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   value={values.instagram}
                   onChange={handleChange}
                   placeholder="@seu_instagram"
+                  className="placeholder:text-slate-400"
                 />
                 {errors.instagram && <ErrorBadge message={errors.instagram} />}
               </label>
 
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">
-                  Serviços oferecidos
-                </span>
-                <textarea
-                  name="servicos_oferecidos"
-                  value={values.servicos_oferecidos}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                  placeholder="Digite separados por vírgula, ex: corte, color, hidratação"
-                />
-              </label>
+              {renderMultiValueField(
+                "servicos_oferecidos",
+                "Serviços oferecidos",
+                "Digite um serviço e adicione",
+              )}
 
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">
-                  Técnicas utilizadas
-                </span>
-                <textarea
-                  name="tecnicas_utilizadas"
-                  value={values.tecnicas_utilizadas}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                  placeholder="Digite separados por vírgula"
-                />
-              </label>
+              {renderMultiValueField(
+                "tecnicas_utilizadas",
+                "Técnicas utilizadas",
+                "Digite uma técnica e adicione",
+              )}
 
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">
-                  Produtos aplicados
-                </span>
-                <textarea
-                  name="produtos_aplicados"
-                  value={values.produtos_aplicados}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                  placeholder="Digite separados por vírgula"
-                />
-              </label>
+              {renderMultiValueField(
+                "produtos_aplicados",
+                "Produtos aplicados",
+                "Digite um produto e adicione",
+              )}
 
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">
-                  Profissionais envolvidos *
-                </span>
-                <textarea
-                  name="profissionais_envolvidos"
-                  value={values.profissionais_envolvidos}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                  placeholder="Digite separados por vírgula"
-                />
-                {errors.profissionais_envolvidos && (
-                  <ErrorBadge message={errors.profissionais_envolvidos} />
-                )}
-              </label>
+              {renderMultiValueField(
+                "profissionais_envolvidos",
+                "Profissionais envolvidos *",
+                "Digite um nome e adicione",
+              )}
 
               <div className="space-y-3 md:col-span-2">
                 <div>

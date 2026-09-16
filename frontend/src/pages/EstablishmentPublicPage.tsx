@@ -384,7 +384,7 @@ export const EstablishmentPublicPage = () => {
                   <div className="grid gap-4 lg:grid-cols-2">
                     <div className="rounded-2xl border border-slate-200 p-4">
                       <h2 className="text-sm font-semibold text-slate-900">
-                        Servicos oferecidos
+                        Serviços oferecidos
                       </h2>
                       <p className="mt-2 text-sm leading-relaxed text-slate-700">
                         {fullServices}
@@ -392,7 +392,7 @@ export const EstablishmentPublicPage = () => {
                     </div>
                     <div className="rounded-2xl border border-slate-200 p-4">
                       <h2 className="text-sm font-semibold text-slate-900">
-                        Tecnicas utilizadas
+                        Repertório de Técnicas
                       </h2>
                       <p className="mt-2 text-sm leading-relaxed text-slate-700">
                         {fullTechniques}
@@ -400,7 +400,7 @@ export const EstablishmentPublicPage = () => {
                     </div>
                     <div className="rounded-2xl border border-slate-200 p-4">
                       <h2 className="text-sm font-semibold text-slate-900">
-                        Produtos aplicados
+                        Produtos disponíveis
                       </h2>
                       <p className="mt-2 text-sm leading-relaxed text-slate-700">
                         {fullProducts}

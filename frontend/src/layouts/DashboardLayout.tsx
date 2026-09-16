@@ -10,7 +10,15 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Check, Play, X, type LucideIcon } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  CircleUser,
+  IdCardLanyard,
+  Play,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { AuthModal } from "../components/AuthModal";
 import { useAuth } from "../contexts/AuthContext";
 import { Header } from "../components/Header";
@@ -43,6 +51,7 @@ interface CategoryMeta {
 
 interface ProviderBooking {
   id: string;
+  cliente_id?: string;
   tratamento: string;
   profissional_envolvido: string;
   data_hora_inicio: string;
@@ -161,6 +170,9 @@ export const DashboardLayout = ({
   const [providerBookings, setProviderBookings] = useState<ProviderBooking[]>(
     [],
   );
+  const [providerClientNames, setProviderClientNames] = useState<
+    Record<string, string>
+  >({});
   const [providerBookingsLoading, setProviderBookingsLoading] = useState(false);
   const [providerStatusUpdating, setProviderStatusUpdating] = useState<
     string | null
@@ -209,9 +221,33 @@ export const DashboardLayout = ({
           ? (response.data as ProviderBooking[])
           : [];
 
+        const clientIds = Array.from(
+          new Set(
+            bookings
+              .map((booking) => booking.cliente_id)
+              .filter((id): id is string => Boolean(id)),
+          ),
+        );
+
+        const clientNames = await Promise.all(
+          clientIds.map(async (clientId) => {
+            try {
+              const clientResponse = await api.get(`/v1/clientes/${clientId}`);
+              const client = clientResponse.data as ClienteSummary;
+              const resolvedName =
+                client.nome_tratamento?.trim() || client.nome_usuario;
+              return [clientId, resolvedName] as const;
+            } catch {
+              return [clientId, "Cliente não identificado"] as const;
+            }
+          }),
+        );
+
+        setProviderClientNames(Object.fromEntries(clientNames));
         setProviderBookings(sortProviderBookings(bookings));
       } catch {
         setProviderBookings([]);
+        setProviderClientNames({});
       } finally {
         setProviderBookingsLoading(false);
       }
@@ -467,13 +503,31 @@ export const DashboardLayout = ({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 max-md:pr-24">
-          <p className="text-sm font-semibold text-slate-900">
-            {booking.tratamento}
-          </p>
-          <p className="text-sm text-slate-600">
-            {booking.profissional_envolvido}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-slate-800">
+              {booking.tratamento}
+            </p>
+            {booking.cliente_id && (
+              <div className="flex items-center gap-1 text-xs text-slate-600">
+                <span className="font-medium">
+                  <CircleUser
+                    className="h-4 w-4 text-slate-700"
+                    strokeWidth={1.5}
+                  />
+                </span>
+                <span className="font-medium text-slate-700">
+                  {providerClientNames[booking.cliente_id] ||
+                    "Cliente não identificado"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <p className="flex gap-1 mt-1 text-xs text-slate-500">
+            <CalendarDays
+              className="h-4 w-4 text-slate-500"
+              strokeWidth={1.5}
+            />{" "}
             {formatBookingDate(booking.data_hora_inicio)}
           </p>
         </div>
@@ -537,6 +591,15 @@ export const DashboardLayout = ({
             </button>
           ) : null}
         </div>
+      </div>
+
+      <div className="mt-1 flex items-center justify-end gap-1 text-right text-xs">
+        <span className="font-medium text-slate-500">
+          <IdCardLanyard className="h-4 w-4 text-slate-500" strokeWidth={1.5} />
+        </span>
+        <span className="font-medium text-slate-500">
+          {booking.profissional_envolvido}
+        </span>
       </div>
     </div>
   );

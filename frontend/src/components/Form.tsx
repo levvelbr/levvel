@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -12,6 +13,7 @@ import api from "../services/api";
 import type { UserSession } from "../types/auth";
 import {
   getDocumentDigits,
+  maskCep,
   maskCnpj,
   maskCpf,
   maskPhone,
@@ -61,6 +63,23 @@ interface IbgeCity {
 interface ServiceCity {
   state: string;
   city: string;
+}
+
+type LocationInputMode = "cep" | "manual";
+
+interface ViaCepAddress {
+  logradouro: string;
+  bairro: string;
+  localidade: string;
+  uf: string;
+}
+
+interface ViaCepResponse {
+  erro?: boolean;
+  logradouro?: string;
+  bairro?: string;
+  localidade?: string;
+  uf?: string;
 }
 
 type WeekDayKey =
@@ -645,6 +664,20 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
   const [isAutonomo, setIsAutonomo] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationInputMode, setLocationInputMode] =
+    useState<LocationInputMode>("manual");
+  const [cepValue, setCepValue] = useState("");
+  const [cepAddress, setCepAddress] = useState<ViaCepAddress | null>(null);
+  const [cepNumero, setCepNumero] = useState("");
+  const [cepComplemento, setCepComplemento] = useState("");
+  const [isFetchingCep, setIsFetchingCep] = useState(false);
+  const [cepError, setCepError] = useState<string | null>(null);
+  const [locationToggleThumb, setLocationToggleThumb] = useState({
+    left: 0,
+    width: 0,
+  });
+  const cepModeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const manualModeButtonRef = useRef<HTMLButtonElement | null>(null);
   const scheduleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
@@ -661,6 +694,130 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       .then(setUfs)
       .catch(() => setServerError("Não foi possível carregar os estados."));
   }, []);
+
+  useEffect(() => {
+    if (locationInputMode !== "cep") {
+      return;
+    }
+
+    const digits = getDocumentDigits(cepValue, 8);
+
+    if (digits.length !== 8) {
+      setCepAddress(null);
+      setCepError(null);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsFetchingCep(true);
+    setCepError(null);
+
+    fetch(`https://viacep.com.br/ws/${digits}/json/`)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Falha ao consultar o CEP.");
+        }
+
+        return response.json() as Promise<ViaCepResponse>;
+      })
+      .then((data) => {
+        if (isCancelled) {
+          return;
+        }
+
+        if (data.erro) {
+          setCepAddress(null);
+          setCepError("CEP não encontrado.");
+          return;
+        }
+
+        setCepAddress({
+          logradouro: data.logradouro ?? "",
+          bairro: data.bairro ?? "",
+          localidade: data.localidade ?? "",
+          uf: data.uf ?? "",
+        });
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setCepAddress(null);
+          setCepError("Não foi possível consultar o CEP. Tente novamente.");
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsFetchingCep(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [cepValue, locationInputMode]);
+
+  useEffect(() => {
+    if (locationInputMode !== "cep") {
+      return;
+    }
+
+    if (!cepAddress) {
+      setValues((prev) =>
+        prev.localizacao ? { ...prev, localizacao: "" } : prev,
+      );
+      return;
+    }
+
+    const enderecoLinha = [cepAddress.logradouro, cepNumero.trim()]
+      .filter(Boolean)
+      .join(", ");
+
+    const cidadeUf = [cepAddress.localidade, cepAddress.uf]
+      .filter(Boolean)
+      .join(" - ");
+
+    const composed = [
+      enderecoLinha,
+      cepComplemento.trim(),
+      cepAddress.bairro,
+      cidadeUf,
+      `CEP ${maskCep(cepValue)}`,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    setValues((prev) =>
+      prev.localizacao === composed ? prev : { ...prev, localizacao: composed },
+    );
+    setErrors((prev) => {
+      if (!prev.localizacao) {
+        return prev;
+      }
+
+      const nextErrors = { ...prev };
+      delete nextErrors.localizacao;
+      return nextErrors;
+    });
+  }, [locationInputMode, cepAddress, cepNumero, cepComplemento, cepValue]);
+
+  useLayoutEffect(() => {
+    if (hasNoFixedLocation) {
+      return;
+    }
+
+    const activeButton =
+      locationInputMode === "cep"
+        ? cepModeButtonRef.current
+        : manualModeButtonRef.current;
+
+    if (!activeButton) {
+      return;
+    }
+
+    setLocationToggleThumb({
+      left: activeButton.offsetLeft,
+      width: activeButton.offsetWidth,
+    });
+  }, [locationInputMode, hasNoFixedLocation]);
 
   useEffect(() => {
     if (isServiceLocationModalOpen) {
@@ -717,6 +874,12 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
     try {
       const label = await getCurrentLocationLabel();
+      setLocationInputMode("manual");
+      setCepValue("");
+      setCepAddress(null);
+      setCepNumero("");
+      setCepComplemento("");
+      setCepError(null);
       setValues((prev) => ({ ...prev, localizacao: label }));
       setErrors((prev) => {
         const nextErrors = { ...prev };
@@ -760,8 +923,37 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
     if (checked) {
       setValues((prev) => ({ ...prev, localizacao: "" }));
+      setCepValue("");
+      setCepAddress(null);
+      setCepNumero("");
+      setCepComplemento("");
+      setCepError(null);
       openServiceLocationModal();
     }
+  };
+
+  const handleLocationModeChange = (mode: LocationInputMode) => {
+    if (mode === locationInputMode) {
+      return;
+    }
+
+    setLocationInputMode(mode);
+    setValues((prev) => ({ ...prev, localizacao: "" }));
+    setCepValue("");
+    setCepAddress(null);
+    setCepNumero("");
+    setCepComplemento("");
+    setCepError(null);
+    setLocationError(null);
+    setErrors((prev) => {
+      const nextErrors = { ...prev };
+      delete nextErrors.localizacao;
+      return nextErrors;
+    });
+  };
+
+  const handleCepChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setCepValue(maskCep(event.target.value));
   };
 
   const openServiceLocationModal = () => {
@@ -1364,6 +1556,12 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       setIsAutonomo(false);
       setServiceCities([initialServiceCity()]);
       setLocationError(null);
+      setLocationInputMode("manual");
+      setCepValue("");
+      setCepAddress(null);
+      setCepNumero("");
+      setCepComplemento("");
+      setCepError(null);
       setCurrentStep(1);
       onLoginSuccess(session);
     } catch (error: unknown) {
@@ -1519,17 +1717,119 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
               <span className="text-sm font-medium text-slate-700">
                 Localização *
               </span>
-              <Input
-                name="localizacao"
-                value={values.localizacao}
-                onChange={handleChange}
-                disabled={hasNoFixedLocation}
-                placeholder={
-                  hasNoFixedLocation
-                    ? "Use o botão para escolher as cidades"
-                    : "Endereço, bairro ou cidade"
-                }
-              />
+
+              {!hasNoFixedLocation ? (
+                <div className="relative mt-1 flex w-fit flex-wrap gap-1 rounded-full border border-slate-200 bg-slate-50 p-1 text-xs font-semibold">
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-1 rounded-full bg-emerald-700 shadow-sm transition-[left,width] duration-300 ease-in-out"
+                    style={{
+                      left: locationToggleThumb.left,
+                      width: locationToggleThumb.width,
+                    }}
+                  />
+                  <button
+                    ref={cepModeButtonRef}
+                    type="button"
+                    onClick={() => handleLocationModeChange("cep")}
+                    className={`relative z-10 whitespace-nowrap rounded-full px-3 py-1.5 transition-colors duration-300 ${
+                      locationInputMode === "cep"
+                        ? "text-white"
+                        : "text-slate-600 hover:text-emerald-700"
+                    }`}
+                  >
+                    Preencher com CEP
+                  </button>
+                  <button
+                    ref={manualModeButtonRef}
+                    type="button"
+                    onClick={() => handleLocationModeChange("manual")}
+                    className={`relative z-10 whitespace-nowrap rounded-full px-3 py-1.5 transition-colors duration-300 ${
+                      locationInputMode === "manual"
+                        ? "text-white"
+                        : "text-slate-600 hover:text-emerald-700"
+                    }`}
+                  >
+                    Preencher por extenso
+                  </button>
+                </div>
+              ) : null}
+
+              {hasNoFixedLocation ? (
+                <Input
+                  name="localizacao"
+                  value={values.localizacao}
+                  onChange={handleChange}
+                  disabled
+                  placeholder="Use o botão para escolher as cidades"
+                />
+              ) : locationInputMode === "manual" ? (
+                <Input
+                  name="localizacao"
+                  value={values.localizacao}
+                  onChange={handleChange}
+                  placeholder="Endereço, bairro ou cidade"
+                />
+              ) : (
+                <div className="space-y-3">
+                  <Input
+                    name="cep"
+                    value={cepValue}
+                    onChange={handleCepChange}
+                    inputMode="numeric"
+                    placeholder="00000-000"
+                    maxLength={9}
+                  />
+                  {isFetchingCep ? (
+                    <p className="text-xs text-slate-500">
+                      Buscando endereço...
+                    </p>
+                  ) : null}
+                  {cepError ? <ErrorBadge message={cepError} /> : null}
+                  {cepAddress ? (
+                    <>
+                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900">
+                        {[
+                          cepAddress.logradouro,
+                          cepAddress.bairro,
+                          [cepAddress.localidade, cepAddress.uf]
+                            .filter(Boolean)
+                            .join(" - "),
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="space-y-1">
+                          <span className="text-xs font-medium text-slate-600">
+                            Número
+                          </span>
+                          <Input
+                            value={cepNumero}
+                            onChange={(event) =>
+                              setCepNumero(event.target.value)
+                            }
+                            placeholder="Número"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-xs font-medium text-slate-600">
+                            Complemento
+                          </span>
+                          <Input
+                            value={cepComplemento}
+                            onChange={(event) =>
+                              setCepComplemento(event.target.value)
+                            }
+                            placeholder="Apto, bloco, referência (opcional)"
+                          />
+                        </label>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-3">
                 <label className="flex min-w-0 items-start gap-2 text-sm text-slate-600">
                   <input
@@ -1542,26 +1842,38 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   />
                   <span>Não possuo local fixo de atendimento</span>
                 </label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleUseCurrentLocation}
-                  disabled={isLocating || hasNoFixedLocation}
-                  aria-label={
-                    hasNoFixedLocation
-                      ? "Usar minha localização indisponível enquanto o atendimento sem local fixo estiver ativo"
-                      : "Usar minha localização"
-                  }
-                  title={
-                    hasNoFixedLocation
-                      ? "Desmarque 'Não possuo local fixo de atendimento' para usar sua localização"
-                      : undefined
-                  }
-                  className="shrink-0 px-3 py-1.5 text-xs disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                  <LocateFixed className="mr-1.5 h-3.5 w-3.5" strokeWidth={2} />
-                  {isLocating ? "Localizando..." : "Usar minha localização"}
-                </Button>
+                {!hasNoFixedLocation ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleUseCurrentLocation}
+                    disabled={isLocating}
+                    aria-label="Usar minha localização"
+                    className="shrink-0 px-3 py-1.5 text-xs disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <LocateFixed
+                      className="mr-1.5 h-3.5 w-3.5"
+                      strokeWidth={2}
+                    />
+                    {isLocating ? "Localizando..." : "Usar minha localização"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleUseCurrentLocation}
+                    disabled
+                    aria-label="Usar minha localização indisponível enquanto o atendimento sem local fixo estiver ativo"
+                    title="Desmarque 'Não possuo local fixo de atendimento' para usar sua localização"
+                    className="shrink-0 px-3 py-1.5 text-xs disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <LocateFixed
+                      className="mr-1.5 h-3.5 w-3.5"
+                      strokeWidth={2}
+                    />
+                    Usar minha localização
+                  </Button>
+                )}
               </div>
               {hasNoFixedLocation ? (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">

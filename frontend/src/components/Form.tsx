@@ -654,8 +654,12 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
   const [serviceCities, setServiceCities] = useState<ServiceCity[]>([
     initialServiceCity(),
   ]);
+  const [atendeEmDiferentesEstados, setAtendeEmDiferentesEstados] =
+    useState(false);
   const [isServiceLocationModalOpen, setIsServiceLocationModalOpen] =
     useState(false);
+  const serviceLocationModalRef = useRef<HTMLDivElement | null>(null);
+  const previousFocusedElementRef = useRef<HTMLElement | null>(null);
   const [isServiceLocationModalRendered, setIsServiceLocationModalRendered] =
     useState(false);
   const [isServiceLocationModalClosing, setIsServiceLocationModalClosing] =
@@ -836,6 +840,94 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     return () => window.clearTimeout(timeoutId);
   }, [isServiceLocationModalOpen, isServiceLocationModalRendered]);
 
+  useEffect(() => {
+    if (!isServiceLocationModalOpen || !serviceLocationModalRef.current) {
+      return;
+    }
+
+    const modal = serviceLocationModalRef.current;
+    const previousFocusedElement = document.activeElement;
+    previousFocusedElementRef.current =
+      previousFocusedElement instanceof HTMLElement
+        ? previousFocusedElement
+        : null;
+
+    const focusableSelector = [
+      "button:not([disabled])",
+      "[href]",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(", ");
+
+    const focusableElements = Array.from(
+      modal.querySelectorAll<HTMLElement>(focusableSelector),
+    );
+    const firstFocusable = focusableElements[0] ?? modal;
+    firstFocusable.focus();
+
+    const inertElements = Array.from(
+      document.querySelectorAll<HTMLElement>(focusableSelector),
+    ).filter(
+      (element) =>
+        !modal.contains(element) && !element.hasAttribute("data-modal-guard"),
+    );
+
+    inertElements.forEach((element) => {
+      element.setAttribute("data-modal-guard", "true");
+      element.setAttribute("inert", "");
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeServiceLocationModal();
+        return;
+      }
+
+      if (event.key !== "Tab" || !modal) {
+        return;
+      }
+
+      const elements = Array.from(
+        modal.querySelectorAll<HTMLElement>(focusableSelector),
+      );
+
+      if (!elements.length) {
+        event.preventDefault();
+        modal.focus();
+        return;
+      }
+
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      const activeElement = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey && activeElement === first) {
+        event.preventDefault();
+        last.focus();
+        return;
+      }
+
+      if (!event.shiftKey && activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      inertElements.forEach((element) => {
+        element.removeAttribute("inert");
+        element.removeAttribute("data-modal-guard");
+      });
+      previousFocusedElementRef.current?.focus();
+    };
+  }, [isServiceLocationModalOpen]);
+
   const stepTitles = [
     "Dados principais",
     "Detalhes do estabelecimento",
@@ -967,22 +1059,58 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     setIsServiceLocationModalOpen(false);
   };
 
+  const handleMultiStateToggle = (checked: boolean) => {
+    setAtendeEmDiferentesEstados(checked);
+
+    if (checked) {
+      return;
+    }
+
+    setServiceCities((prev) => {
+      const defaultState = prev[0]?.state ?? "";
+
+      return prev.map((item, index) =>
+        index === 0
+          ? item
+          : {
+              ...item,
+              state: defaultState,
+              city: "",
+            },
+      );
+    });
+  };
+
   const handleServiceCityChange = async (
     index: number,
     field: keyof ServiceCity,
     value: string,
   ) => {
-    setServiceCities((prev) =>
-      prev.map((item, itemIndex) =>
-        itemIndex === index
-          ? {
-              ...item,
-              [field]: value,
-              ...(field === "state" ? { city: "" } : {}),
-            }
-          : item,
-      ),
-    );
+    setServiceCities((prev) => {
+      const nextRowState =
+        field === "state" ? value : (prev[index]?.state ?? "");
+      const defaultState = prev[0]?.state ?? "";
+
+      return prev.map((item, itemIndex) => {
+        if (itemIndex === index) {
+          return {
+            ...item,
+            [field]: value,
+            ...(field === "state" ? { city: "" } : {}),
+          };
+        }
+
+        if (field === "state" && itemIndex > 0 && !atendeEmDiferentesEstados) {
+          return {
+            ...item,
+            state: nextRowState || defaultState,
+            city: "",
+          };
+        }
+
+        return item;
+      });
+    });
 
     if (field !== "state" || !value || citiesByState[value]) {
       return;
@@ -1009,12 +1137,21 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
   };
 
   const handleSaveServiceCities = () => {
-    const validCities = serviceCities.filter((item) => item.state && item.city);
+    const normalizedCities = serviceCities.map((item, index) =>
+      !atendeEmDiferentesEstados && index > 0
+        ? { ...item, state: serviceCities[0]?.state ?? item.state }
+        : item,
+    );
+    const validCities = normalizedCities.filter(
+      (item) => item.state && item.city,
+    );
 
-    if (!validCities.length || validCities.length !== serviceCities.length) {
+    if (!validCities.length || validCities.length !== normalizedCities.length) {
       setServerError("Selecione o estado e a cidade de cada atendimento.");
       return;
     }
+
+    setServiceCities(normalizedCities);
 
     const locationLabel = validCities
       .map((item) => `${item.city} - ${item.state}`)
@@ -1033,15 +1170,29 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
   };
 
   const handleAddServiceCity = () => {
-    setServiceCities((prev) => [...prev, initialServiceCity()]);
+    setServiceCities((prev) => {
+      const defaultState = prev[0]?.state ?? "";
+      return [...prev, { state: defaultState, city: "" }];
+    });
   };
 
   const handleRemoveServiceCity = (index: number) => {
-    setServiceCities((prev) =>
-      prev.length === 1
-        ? [initialServiceCity()]
-        : prev.filter((_, itemIndex) => itemIndex !== index),
-    );
+    setServiceCities((prev) => {
+      if (prev.length === 1) {
+        return [initialServiceCity()];
+      }
+
+      const nextCities = prev.filter((_, itemIndex) => itemIndex !== index);
+
+      if (!atendeEmDiferentesEstados && nextCities.length > 0) {
+        const defaultState = nextCities[0]?.state ?? "";
+        return nextCities.map((item, itemIndex) =>
+          itemIndex === 0 ? item : { ...item, state: defaultState },
+        );
+      }
+
+      return nextCities;
+    });
   };
 
   const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -1580,7 +1731,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     <form
       id="establishment-form"
       onSubmit={handleSubmit}
-      className="rounded-3xl bg-white/95 p-8 shadow-md ring-1 ring-slate-200"
+      className="rounded-3xl bg-white/95 p-8 ring-1 ring-slate-200"
     >
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
@@ -2363,23 +2514,43 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
               ? "auth-modal-overlay-exit"
               : "auth-modal-overlay-enter"
           }`}
-          onClick={closeServiceLocationModal}
+          onMouseDown={(event) => {
+            event.stopPropagation();
+          }}
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) {
+              event.stopPropagation();
+              return;
+            }
+
+            event.stopPropagation();
+            closeServiceLocationModal();
+          }}
         >
           <div
+            ref={serviceLocationModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="service-location-modal-title"
+            tabIndex={-1}
             className={`auth-modal-panel flex max-h-[95vh] w-full max-w-2xl flex-col overflow-visible rounded-2xl bg-white shadow-2xl ${
               isServiceLocationModalClosing
                 ? "auth-modal-panel-exit"
                 : "auth-modal-panel-enter"
             }`}
+            onMouseDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">
+                <h3
+                  id="service-location-modal-title"
+                  className="text-lg font-semibold text-slate-900"
+                >
                   Cidades de atendimento
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Escolha um estado e uma cidade para cada local de atendimento.
+                  Selecione o estado principal e as cidades atendidas.
                 </p>
               </div>
               <button
@@ -2393,6 +2564,18 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
             </div>
 
             <div className="auth-modal-content-enter scrollbar-none overflow-visible px-5 py-4">
+              <label className="mb-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={atendeEmDiferentesEstados}
+                  onChange={(event) =>
+                    handleMultiStateToggle(event.target.checked)
+                  }
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
+                />
+                <span>Atendo em diferentes estados</span>
+              </label>
+
               <div className="space-y-3">
                 {serviceCities.map((serviceCity, index) => {
                   const cities = citiesByState[serviceCity.state] ?? [];
@@ -2412,6 +2595,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                           onChange={(state) =>
                             handleServiceCityChange(index, "state", state)
                           }
+                          disabled={index > 0 && !atendeEmDiferentesEstados}
                           placeholder="Digite a UF"
                           options={ufs.map((state) => ({
                             value: state.sigla,

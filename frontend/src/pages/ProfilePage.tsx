@@ -105,7 +105,7 @@ const STATUS_COLORS: Record<Agendamento["status"], string> = {
 
 const PROVIDER_STATUS_COLORS: Record<Agendamento["status"], string> = {
   pendente: "bg-amber-100 text-amber-800",
-  confirmado: "bg-blue-100 text-blue-800",
+  confirmado: "bg-emerald-100 text-emerald-800",
   recusado: "bg-rose-100 text-rose-700",
   em_andamento: "bg-sky-100 text-sky-800",
   concluido: "bg-slate-100 text-slate-700",
@@ -119,6 +119,14 @@ const getProviderBookingCardColors = (status: Agendamento["status"]) => {
 
   if (status === "cancelado" || status === "recusado") {
     return "border-rose-200 bg-rose-50";
+  }
+
+  if (status === "confirmado") {
+    return "border-emerald-200 bg-emerald-50";
+  }
+
+  if (status === "em_andamento") {
+    return "border-slate-200 bg-white";
   }
 
   if (status === "concluido") {
@@ -165,10 +173,10 @@ const statusOrder = new Map(
 
 const providerInitialStatusPriority: Record<Agendamento["status"], number> = {
   pendente: 0,
-  confirmado: 1,
+  em_andamento: 1,
+  confirmado: 2,
   recusado: 2,
   cancelado: 2,
-  em_andamento: 3,
   concluido: 4,
 };
 
@@ -188,6 +196,7 @@ export const ProfilePage = ({
   const { session, logout, updateSession } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const agendaStatusParam = searchParams.get("agendaStatus");
   const isEstablishment = session?.role === "estabelecimento";
   const accentButton = isEstablishment
     ? "bg-blue-700 hover:bg-blue-800"
@@ -232,7 +241,9 @@ export const ProfilePage = ({
   >({});
   const [agendamentosLoading, setAgendamentosLoading] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
-  const [bookingStatusFilter, setBookingStatusFilter] = useState("");
+  const [bookingStatusFilter, setBookingStatusFilter] = useState(
+    agendaStatusParam ?? "",
+  );
   const [bookingProfessionalFilter, setBookingProfessionalFilter] =
     useState("");
   const [bookingClientFilter, setBookingClientFilter] = useState("");
@@ -389,7 +400,11 @@ export const ProfilePage = ({
         : null;
 
       return (
-        (!bookingStatusFilter || booking.status === bookingStatusFilter) &&
+        (!bookingStatusFilter ||
+          (bookingStatusFilter === "upcoming"
+            ? booking.status === "em_andamento" ||
+              booking.status === "confirmado"
+            : booking.status === bookingStatusFilter)) &&
         (!bookingProfessionalFilter ||
           booking.profissional_envolvido === bookingProfessionalFilter) &&
         (!bookingClientFilter || booking.cliente_id === bookingClientFilter) &&
@@ -1170,6 +1185,9 @@ export const ProfilePage = ({
                           className={`${groupedInputClass} min-w-0 flex-1`}
                         >
                           <option value="">Todos os status</option>
+                          <option value="upcoming">
+                            Próximos agendamentos
+                          </option>
                           {bookingStatuses.map((status) => (
                             <option key={status} value={status}>
                               {STATUS_LABELS[status]}
@@ -1240,9 +1258,9 @@ export const ProfilePage = ({
                   filteredAgendamentos.map((ag) => (
                     <div
                       key={ag.id}
-                      className={`rounded-3xl border p-5 shadow-sm ${isEstablishment ? getProviderBookingCardColors(ag.status) : "border-slate-200 bg-white"}`}
+                      className={`${isEstablishment ? "flex min-h-44 flex-col justify-between rounded-2xl border p-4 max-md:min-h-48" : "rounded-3xl border p-5"} shadow-sm ${isEstablishment ? getProviderBookingCardColors(ag.status) : "border-slate-200 bg-white"}`}
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0 space-y-2">
                           <p className="font-semibold text-slate-900">
                             {ag.tratamento}
@@ -1275,13 +1293,15 @@ export const ProfilePage = ({
                           )}
                         </div>
                         <span
-                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${isEstablishment ? PROVIDER_STATUS_COLORS[ag.status] : STATUS_COLORS[ag.status]}`}
+                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${isEstablishment ? PROVIDER_STATUS_COLORS[ag.status] : STATUS_COLORS[ag.status]}`}
                         >
                           {STATUS_LABELS[ag.status]}
                         </span>
                       </div>
 
-                      <div className="mt-3 flex items-end justify-between gap-3">
+                      <div
+                        className={`${isEstablishment ? "mt-2" : "mt-3"} flex items-end justify-between gap-3`}
+                      >
                         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
                           <span className="flex items-center gap-1">
                             <CalendarDays className="h-4 w-4 text-slate-600" />
@@ -1320,7 +1340,9 @@ export const ProfilePage = ({
 
                       {/* Establishment status actions */}
                       {session.role === "estabelecimento" && (
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div
+                          className={`${isEstablishment ? "mt-2" : "mt-3"} flex flex-wrap gap-2`}
+                        >
                           {ag.status === "pendente" && (
                             <>
                               <button
@@ -1329,7 +1351,7 @@ export const ProfilePage = ({
                                 onClick={() =>
                                   handleStatusUpdate(ag.id, "confirmado")
                                 }
-                                className="flex items-center gap-1 rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+                                className="flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
                               >
                                 <Check
                                   className="h-3.5 w-3.5"
@@ -1358,7 +1380,7 @@ export const ProfilePage = ({
                                 onClick={() =>
                                   handleStatusUpdate(ag.id, "em_andamento")
                                 }
-                                className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+                                className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
                               >
                                 Iniciar atendimento
                               </button>

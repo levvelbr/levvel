@@ -15,6 +15,7 @@ import {
   Check,
   CircleUser,
   IdCardLanyard,
+  Maximize2,
   Play,
   X,
   type LucideIcon,
@@ -81,7 +82,7 @@ const PROVIDER_STATUS_LABELS: Record<ProviderBooking["status"], string> = {
 
 const PROVIDER_STATUS_COLORS: Record<ProviderBooking["status"], string> = {
   pendente: "bg-amber-100 text-amber-800 ring-amber-200",
-  confirmado: "bg-blue-100 text-blue-800 ring-blue-200",
+  confirmado: "bg-emerald-100 text-emerald-800 ring-emerald-200",
   recusado: "bg-rose-100 text-rose-700 ring-rose-200",
   em_andamento: "bg-sky-100 text-sky-800 ring-sky-200",
   concluido: "bg-slate-100 text-slate-700 ring-slate-200",
@@ -91,7 +92,7 @@ const PROVIDER_STATUS_COLORS: Record<ProviderBooking["status"], string> = {
 const PROVIDER_STATUS_PRIORITY: Record<ProviderBooking["status"], number> = {
   pendente: 0,
   confirmado: 1,
-  em_andamento: 2,
+  em_andamento: 0,
   concluido: 3,
   cancelado: 0,
   recusado: 1,
@@ -126,6 +127,14 @@ const getProviderBookingCardColors = (status: ProviderBooking["status"]) => {
 
   if (status === "cancelado" || status === "recusado") {
     return "border-rose-200 bg-rose-50";
+  }
+
+  if (status === "confirmado") {
+    return "border-emerald-200 bg-emerald-50";
+  }
+
+  if (status === "em_andamento") {
+    return "border-slate-200 bg-white";
   }
 
   if (status === "concluido") {
@@ -499,9 +508,9 @@ export const DashboardLayout = ({
   const renderProviderBookingCard = (booking: ProviderBooking) => (
     <div
       key={booking.id}
-      className={`relative rounded-2xl border p-4 ${getProviderBookingCardColors(booking.status)}`}
+      className={`relative flex h-28 shrink-0 flex-col justify-between rounded-2xl border p-3 max-md:h-32 ${getProviderBookingCardColors(booking.status)}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 max-md:pr-24">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold text-slate-800">
@@ -523,7 +532,7 @@ export const DashboardLayout = ({
             )}
           </div>
 
-          <p className="flex gap-1 mt-1 text-xs text-slate-500">
+          <p className="mt-1 flex gap-1 text-xs text-slate-500">
             <CalendarDays
               className="h-4 w-4 text-slate-500"
               strokeWidth={1.5}
@@ -532,9 +541,9 @@ export const DashboardLayout = ({
           </p>
         </div>
 
-        <div className="flex flex-col items-end gap-2 max-md:w-full max-md:pt-2">
+        <div className="flex flex-col items-end gap-1.5 max-md:w-full max-md:pt-2">
           <span
-            className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 max-md:absolute max-md:right-4 max-md:top-4 ${PROVIDER_STATUS_COLORS[booking.status]}`}
+            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 max-md:absolute max-md:right-3 max-md:top-3 ${PROVIDER_STATUS_COLORS[booking.status]}`}
           >
             {PROVIDER_STATUS_LABELS[booking.status]}
           </span>
@@ -549,7 +558,7 @@ export const DashboardLayout = ({
                 }
                 aria-label="Recusar agendamento"
                 title="Recusar agendamento"
-                className="flex h-9 w-9 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                className="flex h-8 w-8 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 disabled:opacity-60"
               >
                 <X className="h-3.5 w-3.5" strokeWidth={2} />
               </button>
@@ -561,7 +570,7 @@ export const DashboardLayout = ({
                 }
                 aria-label="Confirmar agendamento"
                 title="Confirmar agendamento"
-                className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-700 text-white hover:bg-emerald-800 disabled:opacity-60"
+                className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-700 text-white hover:bg-emerald-800 disabled:opacity-60"
               >
                 <Check className="h-3.5 w-3.5" strokeWidth={2} />
               </button>
@@ -573,7 +582,7 @@ export const DashboardLayout = ({
               onClick={() =>
                 handleProviderBookingStatusUpdate(booking.id, "em_andamento")
               }
-              className="flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60 max-md:w-full max-md:justify-center"
+              className="flex items-center gap-1 rounded-md bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60 max-md:w-full max-md:justify-center"
             >
               <Play className="h-3.5 w-3.5" strokeWidth={2} />
               Iniciar atendimento
@@ -593,7 +602,7 @@ export const DashboardLayout = ({
         </div>
       </div>
 
-      <div className="mt-1 flex items-center justify-end gap-1 text-right text-xs">
+      <div className="flex items-center justify-end gap-1 text-right text-xs">
         <span className="font-medium text-slate-500">
           <IdCardLanyard className="h-4 w-4 text-slate-500" strokeWidth={1.5} />
         </span>
@@ -749,9 +758,21 @@ export const DashboardLayout = ({
                       <div className="grid gap-4 lg:grid-cols-2">
                         <div className="space-y-4">
                           <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
-                            <h3 className="text-sm font-semibold text-amber-900">
-                              Pendentes de aprovação
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-semibold text-amber-900">
+                                Pendentes de aprovação
+                              </h3>
+                              <Link
+                                to="/?providerTab=agenda&agendaStatus=pendente"
+                                aria-label="Abrir pendentes de aprovação na agenda"
+                                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                              >
+                                <Maximize2
+                                  className="h-4 w-4"
+                                  strokeWidth={1.8}
+                                />
+                              </Link>
+                            </div>
                             <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                               {providerBookingColumns.left.pending.length ? (
                                 providerBookingColumns.left.pending.map(
@@ -766,9 +787,21 @@ export const DashboardLayout = ({
                           </section>
 
                           <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
-                            <h3 className="text-sm font-semibold text-rose-900">
-                              Cancelados
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-semibold text-rose-900">
+                                Cancelados
+                              </h3>
+                              <Link
+                                to="/?providerTab=agenda&agendaStatus=cancelado"
+                                aria-label="Abrir cancelados na agenda"
+                                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                              >
+                                <Maximize2
+                                  className="h-4 w-4"
+                                  strokeWidth={1.8}
+                                />
+                              </Link>
+                            </div>
                             <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                               {providerBookingColumns.left.cancelled.length ? (
                                 providerBookingColumns.left.cancelled.map(
@@ -785,9 +818,21 @@ export const DashboardLayout = ({
 
                         <div className="space-y-4">
                           <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
-                            <h3 className="text-sm font-semibold text-sky-900">
-                              Próximos agendamentos
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-semibold text-sky-900">
+                                Próximos agendamentos
+                              </h3>
+                              <Link
+                                to="/?providerTab=agenda&agendaStatus=upcoming"
+                                aria-label="Abrir próximos agendamentos na agenda"
+                                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                              >
+                                <Maximize2
+                                  className="h-4 w-4"
+                                  strokeWidth={1.8}
+                                />
+                              </Link>
+                            </div>
                             <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                               {providerBookingColumns.right.active.length ? (
                                 providerBookingColumns.right.active.map(
@@ -802,9 +847,21 @@ export const DashboardLayout = ({
                           </section>
 
                           <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
-                            <h3 className="text-sm font-semibold text-blue-900">
-                              Concluídos
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-semibold text-blue-900">
+                                Concluídos
+                              </h3>
+                              <Link
+                                to="/?providerTab=agenda&agendaStatus=concluido"
+                                aria-label="Abrir concluídos na agenda"
+                                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                              >
+                                <Maximize2
+                                  className="h-4 w-4"
+                                  strokeWidth={1.8}
+                                />
+                              </Link>
+                            </div>
                             <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                               {providerBookingColumns.right.completed.length ? (
                                 providerBookingColumns.right.completed.map(

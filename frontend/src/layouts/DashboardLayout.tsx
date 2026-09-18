@@ -10,7 +10,16 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Check, Play, X, type LucideIcon } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  CircleUser,
+  IdCardLanyard,
+  Maximize2,
+  Play,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { AuthModal } from "../components/AuthModal";
 import { useAuth } from "../contexts/AuthContext";
 import { Header } from "../components/Header";
@@ -21,6 +30,8 @@ import type { BookingEstablishment } from "../components/BookingForm";
 import SearchBar from "../components/SearchBar";
 import api from "../services/api";
 import { getCategoryIcon } from "../utils/categoryIcons";
+import { EstablishmentNavigation } from "../components/EstablishmentNavigation";
+import { ProfilePage } from "../pages/ProfilePage";
 
 interface LayoutProps {
   children?: ReactNode;
@@ -41,6 +52,7 @@ interface CategoryMeta {
 
 interface ProviderBooking {
   id: string;
+  cliente_id?: string;
   tratamento: string;
   profissional_envolvido: string;
   data_hora_inicio: string;
@@ -80,28 +92,56 @@ const PROVIDER_STATUS_COLORS: Record<ProviderBooking["status"], string> = {
 const PROVIDER_STATUS_PRIORITY: Record<ProviderBooking["status"], number> = {
   pendente: 0,
   confirmado: 1,
-  cancelado: 2,
-  em_andamento: 3,
-  recusado: 4,
-  concluido: 5,
+  em_andamento: 0,
+  concluido: 3,
+  cancelado: 0,
+  recusado: 1,
 };
 
 const sortProviderBookings = (bookings: ProviderBooking[]) => {
-  return [...bookings]
-    .sort((a, b) => {
-      const priorityDiff =
-        PROVIDER_STATUS_PRIORITY[a.status] - PROVIDER_STATUS_PRIORITY[b.status];
+  return [...bookings].sort((a, b) => {
+    const priorityDiff =
+      PROVIDER_STATUS_PRIORITY[a.status] - PROVIDER_STATUS_PRIORITY[b.status];
 
-      if (priorityDiff !== 0) {
-        return priorityDiff;
-      }
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
 
-      return (
-        new Date(a.data_hora_inicio).getTime() -
-        new Date(b.data_hora_inicio).getTime()
-      );
-    })
-    .slice(0, 6);
+    return (
+      new Date(b.data_hora_inicio).getTime() -
+      new Date(a.data_hora_inicio).getTime()
+    );
+  });
+};
+
+const isProviderPendingBooking = (booking: ProviderBooking) =>
+  booking.status === "pendente";
+
+const isProviderCancelledBooking = (booking: ProviderBooking) =>
+  booking.status === "cancelado" || booking.status === "recusado";
+
+const getProviderBookingCardColors = (status: ProviderBooking["status"]) => {
+  if (status === "pendente") {
+    return "border-amber-200 bg-amber-50";
+  }
+
+  if (status === "cancelado" || status === "recusado") {
+    return "border-rose-200 bg-rose-50";
+  }
+
+  if (status === "confirmado") {
+    return "border-emerald-200 bg-emerald-50";
+  }
+
+  if (status === "em_andamento") {
+    return "border-slate-200 bg-white";
+  }
+
+  if (status === "concluido") {
+    return "border-blue-200 bg-blue-50";
+  }
+
+  return "border-slate-200 bg-white";
 };
 
 const formatBookingDate = (iso: string) => {
@@ -122,6 +162,7 @@ export const DashboardLayout = ({
   const location = useLocation();
   const { session, isAuthenticated, login, logout, updateSession } = useAuth();
   const isProviderView = isAuthenticated && session?.role === "estabelecimento";
+  const providerTab = new URLSearchParams(location.search).get("providerTab");
   const isServicesPage = variant === "services";
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -138,6 +179,9 @@ export const DashboardLayout = ({
   const [providerBookings, setProviderBookings] = useState<ProviderBooking[]>(
     [],
   );
+  const [providerClientNames, setProviderClientNames] = useState<
+    Record<string, string>
+  >({});
   const [providerBookingsLoading, setProviderBookingsLoading] = useState(false);
   const [providerStatusUpdating, setProviderStatusUpdating] = useState<
     string | null
@@ -186,9 +230,33 @@ export const DashboardLayout = ({
           ? (response.data as ProviderBooking[])
           : [];
 
+        const clientIds = Array.from(
+          new Set(
+            bookings
+              .map((booking) => booking.cliente_id)
+              .filter((id): id is string => Boolean(id)),
+          ),
+        );
+
+        const clientNames = await Promise.all(
+          clientIds.map(async (clientId) => {
+            try {
+              const clientResponse = await api.get(`/v1/clientes/${clientId}`);
+              const client = clientResponse.data as ClienteSummary;
+              const resolvedName =
+                client.nome_tratamento?.trim() || client.nome_usuario;
+              return [clientId, resolvedName] as const;
+            } catch {
+              return [clientId, "Cliente não identificado"] as const;
+            }
+          }),
+        );
+
+        setProviderClientNames(Object.fromEntries(clientNames));
         setProviderBookings(sortProviderBookings(bookings));
       } catch {
         setProviderBookings([]);
+        setProviderClientNames({});
       } finally {
         setProviderBookingsLoading(false);
       }
@@ -414,6 +482,137 @@ export const DashboardLayout = ({
     );
   });
 
+  const providerBookingColumns = useMemo(() => {
+    const pending = providerBookings.filter(isProviderPendingBooking);
+    const cancelled = providerBookings.filter(isProviderCancelledBooking);
+    const active = providerBookings.filter(
+      (booking) =>
+        booking.status === "confirmado" || booking.status === "em_andamento",
+    );
+    const completed = providerBookings.filter(
+      (booking) => booking.status === "concluido",
+    );
+
+    return {
+      left: {
+        pending: sortProviderBookings(pending),
+        cancelled: sortProviderBookings(cancelled),
+      },
+      right: {
+        active: sortProviderBookings(active),
+        completed: sortProviderBookings(completed),
+      },
+    };
+  }, [providerBookings]);
+
+  const renderProviderBookingCard = (booking: ProviderBooking) => (
+    <div
+      key={booking.id}
+      className={`relative flex h-28 shrink-0 flex-col justify-between rounded-2xl border p-3 max-md:h-32 ${getProviderBookingCardColors(booking.status)}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 max-md:pr-24">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-slate-800">
+              {booking.tratamento}
+            </p>
+            {booking.cliente_id && (
+              <div className="flex items-center gap-1 text-xs text-slate-600">
+                <span className="font-medium">
+                  <CircleUser
+                    className="h-4 w-4 text-slate-700"
+                    strokeWidth={1.5}
+                  />
+                </span>
+                <span className="font-medium text-slate-700">
+                  {providerClientNames[booking.cliente_id] ||
+                    "Cliente não identificado"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <p className="mt-1 flex gap-1 text-xs text-slate-500">
+            <CalendarDays
+              className="h-4 w-4 text-slate-500"
+              strokeWidth={1.5}
+            />{" "}
+            {formatBookingDate(booking.data_hora_inicio)}
+          </p>
+        </div>
+
+        <div className="flex flex-col items-end gap-1.5 max-md:w-full max-md:pt-2">
+          <span
+            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 max-md:absolute max-md:right-3 max-md:top-3 ${PROVIDER_STATUS_COLORS[booking.status]}`}
+          >
+            {PROVIDER_STATUS_LABELS[booking.status]}
+          </span>
+
+          {booking.status === "pendente" ? (
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={providerStatusUpdating === booking.id}
+                onClick={() =>
+                  handleProviderBookingStatusUpdate(booking.id, "recusado")
+                }
+                aria-label="Recusar agendamento"
+                title="Recusar agendamento"
+                className="flex h-8 w-8 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+              >
+                <X className="h-3.5 w-3.5" strokeWidth={2} />
+              </button>
+              <button
+                type="button"
+                disabled={providerStatusUpdating === booking.id}
+                onClick={() =>
+                  handleProviderBookingStatusUpdate(booking.id, "confirmado")
+                }
+                aria-label="Confirmar agendamento"
+                title="Confirmar agendamento"
+                className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-700 text-white hover:bg-emerald-800 disabled:opacity-60"
+              >
+                <Check className="h-3.5 w-3.5" strokeWidth={2} />
+              </button>
+            </div>
+          ) : booking.status === "confirmado" ? (
+            <button
+              type="button"
+              disabled={providerStatusUpdating === booking.id}
+              onClick={() =>
+                handleProviderBookingStatusUpdate(booking.id, "em_andamento")
+              }
+              className="flex items-center gap-1 rounded-md bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60 max-md:w-full max-md:justify-center"
+            >
+              <Play className="h-3.5 w-3.5" strokeWidth={2} />
+              Iniciar atendimento
+            </button>
+          ) : booking.status === "em_andamento" ? (
+            <button
+              type="button"
+              disabled={providerStatusUpdating === booking.id}
+              onClick={() => handleProviderBookingFinalize(booking.id)}
+              className="rounded-md bg-sky-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-800 disabled:opacity-60"
+            >
+              {providerStatusUpdating === booking.id
+                ? "Finalizando..."
+                : "Finalizar"}
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-1 text-right text-xs">
+        <span className="font-medium text-slate-500">
+          <IdCardLanyard className="h-4 w-4 text-slate-500" strokeWidth={1.5} />
+        </span>
+        <span className="font-medium text-slate-500">
+          {booking.profissional_envolvido}
+        </span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Passamos a função de abrir para o Header */}
@@ -422,6 +621,7 @@ export const DashboardLayout = ({
         loggedClientName={session?.nome ?? null}
         loggedClientPhotoUrl={session?.foto_perfil_url ?? null}
         loggedClientRole={session?.role ?? null}
+        loggedClientPersonType={session?.tipo_pessoa}
         onOpenLogin={() => setIsAuthModalOpen(true)}
         onLogout={() => {
           logout();
@@ -430,13 +630,14 @@ export const DashboardLayout = ({
         showSearchBar={showHeaderSearch}
         searchQuery={searchQuery}
         onSearch={setSearchQuery}
-        hideMobileSearchToggle={isServicesPage}
-        compactUserProfile={isServicesPage && showHeaderSearch}
       />
 
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+        onOpenEstablishmentRegistration={() =>
+          setIsEstablishmentModalOpen(true)
+        }
         onAuthChange={(nextSession) => {
           if (nextSession) {
             login(nextSession);
@@ -453,6 +654,10 @@ export const DashboardLayout = ({
         isOpen={isEstablishmentModalOpen}
         onClose={() => setIsEstablishmentModalOpen(false)}
         onOpenLogin={() => setIsAuthModalOpen(true)}
+        onLoginSuccess={(nextSession) => {
+          login(nextSession);
+          setIsEstablishmentModalOpen(false);
+        }}
       />
 
       <BookingModal
@@ -471,193 +676,219 @@ export const DashboardLayout = ({
       {/* O conteúdo da página */}
       <main className="flex-1">
         {isProviderView ? (
-          <section className="bg-linear-to-b from-emerald-50 to-white px-4 py-10 sm:py-14">
+          <section className="bg-linear-to-b from-blue-50 to-white px-4 py-10 sm:py-14">
             <div className="mx-auto grid w-full max-w-5xl gap-6">
-              <div className="rounded-3xl border border-emerald-200 bg-white p-6 shadow-sm sm:p-8">
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                  Painel do Prestador
-                </p>
-                <h1 className="mt-2 text-3xl font-semibold text-emerald-900 sm:text-4xl">
-                  Bem-vindo, {session?.nome}
-                </h1>
-                <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
-                  Aqui você acompanha seus agendamentos e mantém seu perfil
-                  atualizado. A listagem e busca de estabelecimentos fica oculta
-                  no acesso de prestador.
-                </p>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <Link
-                    to="/perfil?tab=bookings"
-                    className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800"
-                  >
-                    Abrir agenda
-                  </Link>
-                  <Link
-                    to="/perfil"
-                    className="rounded-md border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
-                  >
-                    Ver meu perfil
-                  </Link>
+              <EstablishmentNavigation />
+              {providerTab === "profile" || providerTab === "agenda" ? (
+                <ProfilePage
+                  embedded
+                  initialTab={providerTab === "agenda" ? "bookings" : "profile"}
+                />
+              ) : null}
+              {providerTab !== "profile" && providerTab !== "agenda" ? (
+                <div className="rounded-3xl border border-blue-200 bg-white p-6 shadow-sm sm:p-8">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                    Painel do Prestador
+                  </p>
+                  <h1 className="mt-2 text-3xl font-semibold text-blue-950 sm:text-4xl">
+                    Bem-vindo, {session?.nome}
+                  </h1>
+                  <p className="mt-3 max-w-2xl text-sm text-slate-600 sm:text-base">
+                    Aqui você acompanha seus agendamentos e mantém seu perfil
+                    atualizado. A listagem e busca de estabelecimentos fica
+                    oculta no acesso de prestador.
+                  </p>
                 </div>
-              </div>
+              ) : null}
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Link
-                  to="/perfil?tab=bookings"
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
-                >
-                  <p className="text-sm font-semibold text-slate-900">Agenda</p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Visualize solicitações pendentes e atualize status dos
-                    atendimentos.
-                  </p>
-                </Link>
+              {providerTab !== "profile" && providerTab !== "agenda" ? (
+                <>
+                  <div className="hidden gap-4 sm:grid-cols-2">
+                    <Link
+                      to="/?providerTab=agenda"
+                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
+                    >
+                      <p className="text-sm font-semibold text-slate-900">
+                        Agenda
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        Visualize solicitações pendentes e atualize status dos
+                        atendimentos.
+                      </p>
+                    </Link>
 
-                <Link
-                  to="/perfil"
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
-                >
-                  <p className="text-sm font-semibold text-slate-900">Perfil</p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Atualize seus dados e foto para manter sua apresentação em
-                    dia.
-                  </p>
-                </Link>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Agenda
-                    </p>
-                    <h2 className="text-lg font-semibold text-slate-900">
-                      Próximos agendamentos
-                    </h2>
+                    <Link
+                      to="/?providerTab=profile"
+                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
+                    >
+                      <p className="text-sm font-semibold text-slate-900">
+                        Perfil
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        Atualize seus dados e foto para manter sua apresentação
+                        em dia.
+                      </p>
+                    </Link>
                   </div>
-                  <Link
-                    to="/perfil?tab=bookings"
-                    className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  >
-                    Ver todos
-                  </Link>
-                </div>
 
-                {providerBookingsLoading ? (
-                  <p className="text-sm text-slate-500">
-                    Carregando agendamentos...
-                  </p>
-                ) : providerBookings.length === 0 ? (
-                  <p className="text-sm text-slate-500">
-                    Nenhum agendamento encontrado no momento.
-                  </p>
-                ) : (
-                  <div className="grid gap-3">
-                    {providerBookings.map((booking) => (
-                      <div
-                        key={booking.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Agenda
+                        </p>
+                        <h2 className="text-lg font-semibold text-slate-900">
+                          Próximos agendamentos
+                        </h2>
+                      </div>
+                      <Link
+                        to="/?providerTab=agenda"
+                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                       >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-900">
-                              {booking.tratamento}
-                            </p>
-                            <p className="text-sm text-slate-600">
-                              {booking.profissional_envolvido}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {formatBookingDate(booking.data_hora_inicio)}
-                            </p>
-                          </div>
+                        Ver todos
+                      </Link>
+                    </div>
 
-                          <div className="flex flex-col items-end gap-2">
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${PROVIDER_STATUS_COLORS[booking.status]}`}
-                            >
-                              {PROVIDER_STATUS_LABELS[booking.status]}
-                            </span>
+                    {providerBookingsLoading ? (
+                      <p className="text-sm text-slate-500">
+                        Carregando agendamentos...
+                      </p>
+                    ) : providerBookings.length === 0 ? (
+                      <p className="text-sm text-slate-500">
+                        Nenhum agendamento encontrado no momento.
+                      </p>
+                    ) : (
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        <div className="space-y-4">
+                          <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-semibold text-amber-900">
+                                Pendentes de aprovação
+                              </h3>
+                              <Link
+                                to="/?providerTab=agenda&agendaStatus=pendente"
+                                aria-label="Abrir pendentes de aprovação na agenda"
+                                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                              >
+                                <Maximize2
+                                  className="h-4 w-4"
+                                  strokeWidth={1.8}
+                                />
+                              </Link>
+                            </div>
+                            <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                              {providerBookingColumns.left.pending.length ? (
+                                providerBookingColumns.left.pending.map(
+                                  renderProviderBookingCard,
+                                )
+                              ) : (
+                                <p className="text-sm text-slate-500">
+                                  Nenhum agendamento pendente.
+                                </p>
+                              )}
+                            </div>
+                          </section>
 
-                            {booking.status === "pendente" ? (
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  disabled={
-                                    providerStatusUpdating === booking.id
-                                  }
-                                  onClick={() =>
-                                    handleProviderBookingStatusUpdate(
-                                      booking.id,
-                                      "recusado",
-                                    )
-                                  }
-                                  className="flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
-                                >
-                                  <X className="h-3.5 w-3.5" strokeWidth={2} />
-                                  Recusar
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={
-                                    providerStatusUpdating === booking.id
-                                  }
-                                  onClick={() =>
-                                    handleProviderBookingStatusUpdate(
-                                      booking.id,
-                                      "confirmado",
-                                    )
-                                  }
-                                  className="flex items-center gap-1 rounded-md bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
-                                >
-                                  <Check
-                                    className="h-3.5 w-3.5"
-                                    strokeWidth={2}
-                                  />
-                                  Confirmar
-                                </button>
-                              </div>
-                            ) : booking.status === "confirmado" ? (
-                              <button
-                                type="button"
-                                disabled={providerStatusUpdating === booking.id}
-                                onClick={() =>
-                                  handleProviderBookingStatusUpdate(
-                                    booking.id,
-                                    "em_andamento",
-                                  )
-                                }
-                                className="flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+                          <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-semibold text-rose-900">
+                                Cancelados
+                              </h3>
+                              <Link
+                                to="/?providerTab=agenda&agendaStatus=cancelado"
+                                aria-label="Abrir cancelados na agenda"
+                                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                               >
-                                <Play className="h-3.5 w-3.5" strokeWidth={2} />
-                                Iniciar atendimento
-                              </button>
-                            ) : booking.status === "em_andamento" ? (
-                              <button
-                                type="button"
-                                disabled={providerStatusUpdating === booking.id}
-                                onClick={() =>
-                                  handleProviderBookingFinalize(booking.id)
-                                }
-                                className="rounded-md bg-sky-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-800 disabled:opacity-60"
+                                <Maximize2
+                                  className="h-4 w-4"
+                                  strokeWidth={1.8}
+                                />
+                              </Link>
+                            </div>
+                            <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                              {providerBookingColumns.left.cancelled.length ? (
+                                providerBookingColumns.left.cancelled.map(
+                                  renderProviderBookingCard,
+                                )
+                              ) : (
+                                <p className="text-sm text-slate-500">
+                                  Nenhum agendamento cancelado.
+                                </p>
+                              )}
+                            </div>
+                          </section>
+                        </div>
+
+                        <div className="space-y-4">
+                          <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-semibold text-sky-900">
+                                Próximos agendamentos
+                              </h3>
+                              <Link
+                                to="/?providerTab=agenda&agendaStatus=upcoming"
+                                aria-label="Abrir próximos agendamentos na agenda"
+                                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                               >
-                                {providerStatusUpdating === booking.id
-                                  ? "Finalizando..."
-                                  : "Finalizar"}
-                              </button>
-                            ) : null}
-                          </div>
+                                <Maximize2
+                                  className="h-4 w-4"
+                                  strokeWidth={1.8}
+                                />
+                              </Link>
+                            </div>
+                            <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                              {providerBookingColumns.right.active.length ? (
+                                providerBookingColumns.right.active.map(
+                                  renderProviderBookingCard,
+                                )
+                              ) : (
+                                <p className="text-sm text-slate-500">
+                                  Nenhum agendamento a realizar.
+                                </p>
+                              )}
+                            </div>
+                          </section>
+
+                          <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
+                            <div className="flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-semibold text-blue-900">
+                                Concluídos
+                              </h3>
+                              <Link
+                                to="/?providerTab=agenda&agendaStatus=concluido"
+                                aria-label="Abrir concluídos na agenda"
+                                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                              >
+                                <Maximize2
+                                  className="h-4 w-4"
+                                  strokeWidth={1.8}
+                                />
+                              </Link>
+                            </div>
+                            <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                              {providerBookingColumns.right.completed.length ? (
+                                providerBookingColumns.right.completed.map(
+                                  renderProviderBookingCard,
+                                )
+                              ) : (
+                                <p className="text-sm text-slate-500">
+                                  Nenhum agendamento concluído.
+                                </p>
+                              )}
+                            </div>
+                          </section>
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
+                </>
+              ) : null}
             </div>
           </section>
         ) : isServicesPage ? (
           <section className="bg-linear-to-b from-emerald-50 via-slate-50 to-white px-4 py-10 sm:py-14">
             <div className="mx-auto w-full max-w-6xl">
-              <div className="mb-8 grid gap-6 border-b border-emerald-100 pb-8 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:items-end">
+              <div className="mb-8 grid gap-6 border-b border-emerald-100 sm:pb-8 pb-2 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:items-end">
                 <div>
                   <p className="text-sm font-semibold text-emerald-700">
                     Catálogo de serviços
@@ -675,7 +906,7 @@ export const DashboardLayout = ({
                   <SearchBar
                     value={searchQuery}
                     onSearch={setSearchQuery}
-                    autoFocusInput
+                    className="sm:block hidden"
                   />
                 </div>
               </div>

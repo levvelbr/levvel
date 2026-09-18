@@ -73,7 +73,7 @@ export const SearchBar = ({
         </span>
         <Input
           ref={inputRef}
-          className={`rounded-2xl bg-white/95 pl-11 pr-4 shadow-lg shadow-emerald-950/5 ring-1 ring-slate-200 transition focus:border-emerald-200 focus:ring-2 focus:ring-emerald-200 ${
+          className={`rounded-2xl border-transparent bg-white/95 pl-11 pr-4 shadow-lg shadow-emerald-950/5 ring-1 ring-slate-200 transition focus:border-emerald-200 focus:ring-2 focus:ring-emerald-200 ${
             compact ? "py-2.5 text-sm" : "py-4 text-base"
           }`}
           placeholder="Buscar serviços, categorias, prestadores..."

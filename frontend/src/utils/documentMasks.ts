@@ -59,6 +59,17 @@ export const maskCpfOrCnpj = (value: string) => {
 export const getDocumentDigits = (value: string, maxDigits = 14) =>
   digitsOnly(value).slice(0, maxDigits);
 
+/** Formats to the standard Brazilian CEP pattern: 00000-000. */
+export const maskCep = (value: string) => {
+  const digits = digitsOnly(value).slice(0, 8);
+
+  if (digits.length <= 5) {
+    return digits;
+  }
+
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+};
+
 /** Formats to the standard Brazilian mobile pattern: (00) 0 0000-0000. */
 export const maskPhone = (value: string) => {
   const digits = digitsOnly(value).slice(0, 11);

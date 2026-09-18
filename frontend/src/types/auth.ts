@@ -1,4 +1,5 @@
 export type UserRole = "cliente" | "estabelecimento";
+export type EstablishmentPersonType = "autonomo" | "juridica";
 
 export interface UserSession {
   id: string;
@@ -8,4 +9,5 @@ export interface UserSession {
   access_token: string;
   token_type?: string;
   foto_perfil_url?: string | null;
+  tipo_pessoa?: EstablishmentPersonType;
 }

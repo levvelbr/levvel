@@ -2,6 +2,21 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: clip;
+  overflow-y: auto;
+  overscroll-behavior-y: none;
+}
+
+body {
+  min-height: 100%;
+  overflow-x: clip;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+#root {
+  min-height: 100vh;
+  overflow-x: clip;
 }
 
 @theme {

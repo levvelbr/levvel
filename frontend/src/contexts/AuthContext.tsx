@@ -12,7 +12,8 @@ import {
   getStoredSession,
   setStoredSession,
 } from "../services/authStorage";
-import type { UserSession } from "../types/auth";
+import api from "../services/api";
+import type { EstablishmentPersonType, UserSession } from "../types/auth";
 
 interface AuthContextValue {
   session: UserSession | null;
@@ -46,6 +47,53 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, syncSession);
     };
   }, []);
+
+  useEffect(() => {
+    if (session?.role !== "estabelecimento" || !session.id) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    api
+      .get("/v1/estabelecimentos/me")
+      .then((response) => {
+        const profile = response.data as {
+          tipo_pessoa?: EstablishmentPersonType;
+        };
+
+        if (
+          !isCurrent ||
+          (profile.tipo_pessoa !== "autonomo" &&
+            profile.tipo_pessoa !== "juridica")
+        ) {
+          return;
+        }
+
+        setSession((currentSession) => {
+          if (
+            !currentSession ||
+            currentSession.tipo_pessoa === profile.tipo_pessoa
+          ) {
+            return currentSession;
+          }
+
+          const mergedSession: UserSession = {
+            ...currentSession,
+            tipo_pessoa: profile.tipo_pessoa,
+          };
+          setStoredSession(mergedSession);
+          return mergedSession;
+        });
+      })
+      .catch(() => {
+        // The existing session remains usable if profile hydration fails.
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [session?.id, session?.role, session?.tipo_pessoa]);
 
   const value = useMemo<AuthContextValue>(() => {
     const login = (nextSession: UserSession) => {

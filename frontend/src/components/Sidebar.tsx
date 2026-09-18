@@ -34,7 +34,9 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
   const getNavigationClassName = (isActive: boolean) =>
     `flex items-center gap-3 rounded-md px-4 py-2 transition-colors ${
       isActive
-        ? "bg-slate-50 text-slate-700 font-semibold"
+        ? session?.role === "estabelecimento"
+          ? "bg-blue-50 text-blue-800 font-semibold"
+          : "bg-slate-50 text-slate-700 font-semibold"
         : "text-slate-700 hover:bg-slate-100 focus:bg-slate-100"
     }`;
 
@@ -103,7 +105,11 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
           {isAuthenticated ? (
             <>
               <Link
-                to="/perfil"
+                to={
+                  session?.role === "estabelecimento"
+                    ? "/?providerTab=profile"
+                    : "/perfil"
+                }
                 onClick={onClose}
                 className={getNavigationClassName(
                   location.pathname === "/perfil" && !isBookingsPage,
@@ -127,7 +133,11 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
               >
                 <Calendar
                   className={`h-5 w-5 ${
-                    isBookingsPage ? "text-slate-700 " : "text-slate-500"
+                    isBookingsPage
+                      ? session?.role === "estabelecimento"
+                        ? "text-blue-700"
+                        : "text-slate-700"
+                      : "text-slate-500"
                   }`}
                   strokeWidth={`${location.pathname === "/" ? 2 : 1.5}`}
                 />

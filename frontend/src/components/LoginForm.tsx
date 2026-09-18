@@ -127,6 +127,11 @@ export const LoginForm = ({
           typeof responseData.foto_perfil_url === "string"
             ? responseData.foto_perfil_url
             : null,
+        tipo_pessoa:
+          responseData.tipo_pessoa === "autonomo" ||
+          responseData.tipo_pessoa === "juridica"
+            ? responseData.tipo_pessoa
+            : undefined,
       };
 
       onLoginSuccess(session);
@@ -140,7 +145,7 @@ export const LoginForm = ({
 
   return (
     <div
-      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
+      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center overflow-hidden overscroll-none bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
         isClosing
           ? "auth-modal-overlay-exit"
           : disableEnterAnimation
@@ -150,7 +155,7 @@ export const LoginForm = ({
       onClick={onClose}
     >
       <div
-        className={`auth-modal-panel w-full max-h-[90vh] overflow-y-auto overflow-x-hidden rounded-3xl bg-white p-4 shadow-2xl transition-[max-width] duration-300 ease-in-out sm:p-6 ${
+        className={`auth-modal-panel max-h-[calc(100dvh-2rem)] min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-contain rounded-3xl bg-white p-4 shadow-2xl transition-[max-width] duration-300 ease-in-out sm:p-6 ${
           isMorphingToRegister ? "max-w-2xl" : "max-w-md"
         } ${
           isClosing

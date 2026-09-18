@@ -48,7 +48,7 @@ export const EstablishmentCard = ({
 
   return (
     <article
-      className="flex h-full w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+      className="flex h-full w-full max-w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
       onClick={handleOpenDetails}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {

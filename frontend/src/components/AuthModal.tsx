@@ -12,12 +12,14 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAuthChange?: (session: UserSession | null) => void;
+  onOpenEstablishmentRegistration?: () => void;
 }
 
 export const AuthModal = ({
   isOpen,
   onClose,
   onAuthChange,
+  onOpenEstablishmentRegistration,
 }: AuthModalProps) => {
   const [isRendered, setIsRendered] = useState(isOpen);
   const [isModalClosing, setIsModalClosing] = useState(false);
@@ -106,6 +108,10 @@ export const AuthModal = ({
           }}
           onBackToLogin={() => {
             switchForm("login");
+          }}
+          onOpenEstablishmentRegistration={() => {
+            onClose();
+            onOpenEstablishmentRegistration?.();
           }}
         />
       ) : null}

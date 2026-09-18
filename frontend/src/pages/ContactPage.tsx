@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, MessageCircle } from "lucide-react";
+import { Mail } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthModal } from "../components/AuthModal";
 import { Header } from "../components/Header";
@@ -9,16 +9,30 @@ import { useAuth } from "../contexts/AuthContext";
 export const ContactPage = () => {
   const navigate = useNavigate();
   const { session, login, logout } = useAuth();
+  const isEstablishment = session?.role === "estabelecimento";
+  const accentText = isEstablishment ? "text-blue-700" : "text-emerald-700";
+  const accentHoverText = isEstablishment
+    ? "hover:text-blue-800"
+    : "hover:text-emerald-800";
+  const accentBorderHover = isEstablishment
+    ? "hover:border-blue-300"
+    : "hover:border-emerald-300";
+  const accentBackgroundHover = isEstablishment
+    ? "hover:bg-blue-50"
+    : "hover:bg-emerald-50";
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-linear-to-b from-emerald-50 via-slate-50 to-white">
+    <div
+      className={`flex h-full min-h-0 flex-col bg-linear-to-b ${isEstablishment ? "from-blue-50" : "from-emerald-50"} via-slate-50 to-white`}
+    >
       <Header
         onOpenMenu={() => setIsSidebarOpen(true)}
         loggedClientName={session?.nome ?? null}
         loggedClientPhotoUrl={session?.foto_perfil_url ?? null}
         loggedClientRole={session?.role ?? null}
+        loggedClientPersonType={session?.tipo_pessoa}
         onOpenLogin={() => setIsAuthModalOpen(true)}
         onLogout={() => {
           logout();
@@ -47,14 +61,18 @@ export const ContactPage = () => {
         <div className="mx-auto flex w-full max-w-4xl flex-col">
           <Link
             to="/"
-            className="inline-flex items-center text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+            className={`inline-flex items-center text-sm font-semibold ${accentText} ${accentHoverText}`}
           >
             Voltar para a home
           </Link>
 
-          <section className="mt-4 border-b border-emerald-100 pb-5">
-            <p className="text-sm font-semibold text-emerald-700">Contato</p>
-            <h1 className="mt-2 text-3xl font-semibold text-emerald-950 sm:text-4xl">
+          <section
+            className={`mt-4 border-b ${isEstablishment ? "border-blue-100" : "border-emerald-100"} pb-5`}
+          >
+            <p className={`text-sm font-semibold ${accentText}`}>Contato</p>
+            <h1
+              className={`mt-2 text-3xl font-semibold ${isEstablishment ? "text-blue-950" : "text-emerald-950"} sm:text-4xl`}
+            >
               Fale com a LevveL
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
@@ -63,42 +81,19 @@ export const ContactPage = () => {
             </p>
           </section>
 
-          <section className="mt-5 grid gap-3 sm:grid-cols-2">
+          <section className="mt-5 grid gap-3">
             <a
               href="mailto:levvel@mail.com"
-              className="group flex flex-col justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50"
+              className={`group flex flex-col justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-colors ${accentBorderHover} ${accentBackgroundHover}`}
             >
-              <Mail className="h-6 w-6 text-emerald-700" strokeWidth={1.8} />
+              <Mail className={`h-6 w-6 ${accentText}`} strokeWidth={1.8} />
               <div className="mt-5">
                 <h2 className="text-lg font-semibold text-slate-900">E-mail</h2>
                 <p className="mt-1 text-sm text-slate-600">
                   Envie sua mensagem para nossa equipe.
                 </p>
-                <p className="mt-3 font-semibold text-emerald-700">
+                <p className={`mt-3 font-semibold ${accentText}`}>
                   levvel@mail.com
-                </p>
-              </div>
-            </a>
-
-            <a
-              href="https://wa.me/55999999999"
-              target="_blank"
-              rel="noreferrer"
-              className="group flex flex-col justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50"
-            >
-              <MessageCircle
-                className="h-6 w-6 text-emerald-700"
-                strokeWidth={1.8}
-              />
-              <div className="mt-5">
-                <h2 className="text-lg font-semibold text-slate-900">
-                  WhatsApp
-                </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Converse com a gente pelo WhatsApp.
-                </p>
-                <p className="mt-3 font-semibold text-emerald-700">
-                  (55) 9 9999-9999
                 </p>
               </div>
             </a>

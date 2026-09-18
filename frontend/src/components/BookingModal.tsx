@@ -60,13 +60,13 @@ export const BookingModal = ({
 
   return (
     <div
-      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm ${
+      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center overflow-hidden overscroll-none bg-slate-950/60 p-4 backdrop-blur-sm ${
         isModalClosing ? "auth-modal-overlay-exit" : "auth-modal-overlay-enter"
       }`}
       onClick={onClose}
     >
       <div
-        className={`auth-modal-panel max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-xl ${
+        className={`auth-modal-panel max-h-[calc(100dvh-2rem)] min-h-0 w-full max-w-lg overflow-x-hidden overflow-y-auto overscroll-contain rounded-3xl bg-white shadow-xl ${
           isModalClosing ? "auth-modal-panel-exit" : "auth-modal-panel-enter"
         }`}
         onClick={(e) => e.stopPropagation()}

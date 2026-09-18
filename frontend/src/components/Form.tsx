@@ -1782,7 +1782,11 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div
+        className={`grid gap-4 md:grid-cols-2 ${
+          isScheduleEditorOpen ? "pb-16" : ""
+        }`}
+      >
         {currentStep === 1 ? (
           <>
             <label className="space-y-2">
@@ -2116,36 +2120,25 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
         {currentStep === 2 ? (
           isScheduleEditorOpen ? (
             <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-              <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={closeScheduleEditor}
-                  className="px-3 py-1.5 text-xs"
+                  className="px-2.5 py-1.5 text-[11px]"
                 >
-                  <ArrowLeft className="mr-1 h-3.5 w-3.5" strokeWidth={2} />
-                  Voltar ao formulário
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={handleSaveSchedule}
-                  className="px-3 py-1.5 text-xs"
-                >
-                  Salvar horários
+                  <ArrowLeft className="mr-1 h-3 w-3" strokeWidth={2} />
+                  Voltar
                 </Button>
               </div>
 
-              <div>
+              <div className="mb-2">
                 <h3 className="text-sm font-semibold text-slate-800">
-                  Horário de funcionamento (24h)
+                  Horário de funcionamento
                 </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Selecione os dias e informe faixas no padrão HH:mm.
-                </p>
               </div>
 
-              <div className="mt-4 space-y-3">
+              <div className="space-y-2">
                 {weekDays.map((day) => {
                   const daySchedule = draftSchedule[day.key];
                   const dayErrorBadge = getDayErrorBadge(
@@ -2156,14 +2149,14 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   return (
                     <div
                       key={day.key}
-                      className={`rounded-xl border px-3 py-3 transition-colors sm:px-4 ${
+                      className={`rounded-xl border px-3 py-2.5 transition-colors ${
                         daySchedule.ativo
                           ? "border-emerald-200 bg-white"
-                          : "border-slate-200 bg-white/70"
+                          : "border-slate-200 bg-slate-100/70"
                       }`}
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <label className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
+                      <div className="flex items-center gap-2">
+                        <label className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-slate-700">
                           <input
                             type="checkbox"
                             checked={daySchedule.ativo}
@@ -2172,43 +2165,41 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                             }
                             className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
                           />
-                          <span className="inline-flex min-w-10 items-center justify-center rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
+                          <span className="inline-flex min-w-10 items-center justify-center rounded-md bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
                             {day.shortLabel}
                           </span>
-                          <span>{day.label}</span>
-                          {dayErrorBadge.hasError ? (
-                            <span className="w-full basis-full wrap-break-word rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700 sm:w-auto sm:basis-auto">
-                              {dayErrorBadge.message}
-                            </span>
-                          ) : null}
+                          <span className="truncate text-[12px] sm:text-sm">
+                            {day.label}
+                          </span>
                         </label>
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={!daySchedule.ativo}
-                          onClick={() => handleAddRange(day.key)}
-                          className="px-3 py-1.5 text-xs"
-                        >
-                          + Adicionar faixa
-                        </Button>
+                        {daySchedule.ativo ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleAddRange(day.key)}
+                            className="shrink-0 px-2 py-1 text-[10px]"
+                          >
+                            + faixa
+                          </Button>
+                        ) : null}
                       </div>
 
-                      <div className="mt-3 space-y-2">
-                        {daySchedule.faixas.map((range, index) => {
-                          const rangeErrorKey = getRangeErrorKey(
-                            day.key,
-                            index,
-                          );
-                          const rangeErrors =
-                            scheduleFieldErrors[rangeErrorKey];
+                      {daySchedule.ativo ? (
+                        <div className="mt-2 space-y-2">
+                          {daySchedule.faixas.map((range, index) => {
+                            const rangeErrorKey = getRangeErrorKey(
+                              day.key,
+                              index,
+                            );
+                            const rangeErrors =
+                              scheduleFieldErrors[rangeErrorKey];
 
-                          return (
-                            <div
-                              key={`${day.key}-${index}`}
-                              className="grid gap-2 sm:grid-cols-[1fr_auto_1fr_auto] sm:items-center"
-                            >
-                              <div>
+                            return (
+                              <div
+                                key={`${day.key}-${index}`}
+                                className="grid grid-cols-[1fr_10px_1fr_28px] items-center gap-1.5"
+                              >
                                 <Input
                                   type="text"
                                   inputMode="numeric"
@@ -2236,20 +2227,17 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                                       )
                                     ] = element;
                                   }}
-                                  className={`border bg-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
+                                  className={`h-9 border bg-white px-2 text-[12px] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
                                     rangeErrors?.inicio
                                       ? "border-rose-300 ring-2 ring-rose-100"
                                       : "border-slate-200"
                                   }`}
                                 />
-                                {rangeErrors?.inicio && !rangeErrors.row ? (
-                                  <ErrorBadge message={rangeErrors.inicio} />
-                                ) : null}
-                              </div>
-                              <span className="hidden text-center text-sm font-medium text-slate-500 sm:block">
-                                até
-                              </span>
-                              <div>
+
+                                <span className="text-center text-[10px] font-semibold text-slate-400">
+                                  -
+                                </span>
+
                                 <Input
                                   type="text"
                                   inputMode="numeric"
@@ -2273,41 +2261,47 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                                       getRangeInputRefKey(day.key, index, "fim")
                                     ] = element;
                                   }}
-                                  className={`border bg-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
+                                  className={`h-9 border bg-white px-2 text-[12px] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
                                     rangeErrors?.fim
                                       ? "border-rose-300 ring-2 ring-rose-100"
                                       : "border-slate-200"
                                   }`}
                                 />
-                                {rangeErrors?.fim && !rangeErrors.row ? (
-                                  <ErrorBadge message={rangeErrors.fim} />
-                                ) : null}
+
+                                <button
+                                  type="button"
+                                  disabled={!daySchedule.ativo}
+                                  onClick={() =>
+                                    handleRemoveRange(day.key, index)
+                                  }
+                                  className={`h-8 rounded-lg border px-1.5 text-[10px] font-semibold transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300 ${
+                                    rangeErrors?.row
+                                      ? "border-rose-300 bg-rose-50 text-rose-700"
+                                      : "border-slate-200 text-slate-600"
+                                  }`}
+                                >
+                                  ×
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                disabled={!daySchedule.ativo}
-                                onClick={() =>
-                                  handleRemoveRange(day.key, index)
-                                }
-                                className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300 ${
-                                  rangeErrors?.row
-                                    ? "border-rose-300 bg-rose-50 text-rose-700"
-                                    : "border-slate-200 text-slate-600"
-                                }`}
-                              >
-                                Remover
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+
+                      {dayErrorBadge.hasError ? (
+                        <p className="mt-2 rounded-full bg-rose-100 px-2 py-1 text-[10px] font-semibold text-rose-700">
+                          {dayErrorBadge.message}
+                        </p>
+                      ) : null}
                     </div>
                   );
                 })}
               </div>
 
               {errors.horario_funcionamento ? (
-                <ErrorBadge message={errors.horario_funcionamento} />
+                <div className="mt-3">
+                  <ErrorBadge message={errors.horario_funcionamento} />
+                </div>
               ) : null}
             </div>
           ) : (
@@ -2485,27 +2479,41 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
         ) : null}
       </div>
 
-      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:justify-between">
-        {currentStep > 1 ? (
-          <Button type="button" variant="outline" onClick={handleBack}>
-            Voltar
-          </Button>
-        ) : (
-          <div />
-        )}
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-          {currentStep < 3 ? (
-            <Button type="button" onClick={handleNext}>
-              Próximo
+      {isScheduleEditorOpen && currentStep === 2 ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:px-6">
+          <div className="pointer-events-auto mx-auto max-w-2xl">
+            <Button
+              type="button"
+              onClick={handleSaveSchedule}
+              className="w-full"
+            >
+              Salvar horários
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:justify-between">
+          {currentStep > 1 ? (
+            <Button type="button" variant="outline" onClick={handleBack}>
+              Voltar
             </Button>
           ) : (
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Enviando..." : "Cadastrar estabelecimento"}
-            </Button>
+            <div />
           )}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            {currentStep < 3 ? (
+              <Button type="button" onClick={handleNext}>
+                Próximo
+              </Button>
+            ) : (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Enviando..." : "Cadastrar estabelecimento"}
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {isServiceLocationModalRendered ? (
         <div

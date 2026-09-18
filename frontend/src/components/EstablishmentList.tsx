@@ -131,7 +131,7 @@ export const EstablishmentList = ({
           {filteredEstablishments.map((establishment, index) => (
             <div
               key={establishment.id}
-              className="establishment-mount"
+              className="establishment-mount min-w-0 max-w-full"
               style={{ animationDelay: `${Math.min(index, 7) * 60}ms` }}
             >
               <EstablishmentCard

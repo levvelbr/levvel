@@ -635,6 +635,9 @@ export const DashboardLayout = ({
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+        onOpenEstablishmentRegistration={() =>
+          setIsEstablishmentModalOpen(true)
+        }
         onAuthChange={(nextSession) => {
           if (nextSession) {
             login(nextSession);

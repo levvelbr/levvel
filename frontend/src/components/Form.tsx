@@ -2521,7 +2521,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
       {isServiceLocationModalRendered ? (
         <div
-          className={`auth-modal-overlay fixed inset-0 z-60 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
+          className={`auth-modal-overlay fixed inset-0 z-60 flex items-center justify-center overflow-hidden overscroll-none bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
             isServiceLocationModalClosing
               ? "auth-modal-overlay-exit"
               : "auth-modal-overlay-enter"
@@ -2545,7 +2545,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
             aria-modal="true"
             aria-labelledby="service-location-modal-title"
             tabIndex={-1}
-            className={`auth-modal-panel flex max-h-[95vh] w-full max-w-2xl flex-col overflow-visible rounded-2xl bg-white shadow-2xl ${
+            className={`auth-modal-panel flex max-h-[calc(100dvh-2rem)] min-h-0 w-full max-w-2xl flex-col overflow-visible rounded-2xl bg-white shadow-2xl ${
               isServiceLocationModalClosing
                 ? "auth-modal-panel-exit"
                 : "auth-modal-panel-enter"
@@ -2575,7 +2575,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
               </button>
             </div>
 
-            <div className="auth-modal-content-enter scrollbar-none overflow-visible px-5 py-4">
+            <div className="auth-modal-content-enter scrollbar-none min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-4">
               <label className="mb-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 <input
                   type="checkbox"

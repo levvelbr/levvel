@@ -35,6 +35,7 @@ interface ClientFormProps {
   onClose: () => void;
   onLoginSuccess: (session: UserSession) => void;
   onBackToLogin?: () => void;
+  onOpenEstablishmentRegistration?: () => void;
 }
 
 const initialFormValues: ClientFormValues = {
@@ -57,6 +58,12 @@ const validateCpf = (value: string) => {
 };
 
 const validateEmail = (value: string) => /\S+@\S+\.\S+/.test(value);
+
+const ErrorBadge = ({ message }: { message: string }) => (
+  <span className="mt-1 inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
+    {message}
+  </span>
+);
 
 const parseUserSession = (
   data: Partial<UserSession> | undefined,
@@ -92,6 +99,7 @@ export const ClientForm = ({
   onClose,
   onLoginSuccess,
   onBackToLogin,
+  onOpenEstablishmentRegistration,
 }: ClientFormProps) => {
   useBodyScrollLock(true);
 
@@ -330,7 +338,7 @@ export const ClientForm = ({
 
   return (
     <div
-      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
+      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center overflow-hidden overscroll-none bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
         isClosing
           ? "auth-modal-overlay-exit"
           : disableEnterAnimation
@@ -340,7 +348,7 @@ export const ClientForm = ({
       onClick={onClose}
     >
       <div
-        className={`auth-modal-panel w-full max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl transition-[max-width] duration-300 ease-in-out sm:p-6 ${
+        className={`auth-modal-panel max-h-[calc(100dvh-2rem)] min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-contain rounded-3xl bg-white p-4 shadow-2xl transition-[max-width] duration-300 ease-in-out sm:p-6 ${
           isMorphingToLogin ? "max-w-md" : "max-w-2xl"
         } ${
           isClosing
@@ -358,31 +366,45 @@ export const ClientForm = ({
               : "auth-modal-content-enter"
           }
         >
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-2xl font-semibold text-emerald-900">
+          <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 sm:mb-6 sm:flex sm:items-start sm:justify-between sm:gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold leading-tight text-emerald-900 sm:text-2xl">
                 Cadastro de cliente
               </h2>
-              <p className="text-sm text-slate-600">Etapa {currentStep} de 2</p>
+              <div className="mt-1 flex flex-wrap items-center gap-1 text-sm text-slate-500">
+                <span>Já tem cadastro?</span>
+                {onBackToLogin ? (
+                  <button
+                    type="button"
+                    onClick={onBackToLogin}
+                    className="font-bold text-emerald-700 hover:underline"
+                  >
+                    Faça login
+                  </button>
+                ) : null}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {onBackToLogin ? (
+            <div className="flex shrink-0 flex-col items-end gap-0.5">
+              <div className="flex items-center gap-2">
+                {onOpenEstablishmentRegistration ? (
+                  <button
+                    type="button"
+                    onClick={onOpenEstablishmentRegistration}
+                    className="whitespace-nowrap text-xs font-medium text-emerald-700 hover:underline sm:text-sm"
+                  >
+                    Cadastrar estabelecimento
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  onClick={onBackToLogin}
-                  className="text-sm font-medium text-emerald-700 hover:underline"
+                  onClick={onClose}
+                  className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                  aria-label="Fechar formulário"
                 >
-                  Voltar para login
+                  <X className="h-5 w-5" strokeWidth={2} />
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
-                aria-label="Fechar formulário"
-              >
-                <X className="h-5 w-5" strokeWidth={2} />
-              </button>
+              </div>
+              <p className="text-sm text-slate-600">Etapa {currentStep} de 2</p>
             </div>
           </div>
 
@@ -412,9 +434,7 @@ export const ClientForm = ({
                     placeholder="Digite seu nome"
                   />
                   {errors.nome_usuario ? (
-                    <span className="text-sm text-red-500">
-                      {errors.nome_usuario}
-                    </span>
+                    <ErrorBadge message={errors.nome_usuario} />
                   ) : null}
                 </label>
 
@@ -429,9 +449,7 @@ export const ClientForm = ({
                     onChange={handleChange}
                     placeholder="voce@exemplo.com"
                   />
-                  {errors.email ? (
-                    <span className="text-sm text-red-500">{errors.email}</span>
-                  ) : null}
+                  {errors.email ? <ErrorBadge message={errors.email} /> : null}
                 </label>
 
                 <label className="space-y-2">
@@ -456,9 +474,7 @@ export const ClientForm = ({
                     onChange={handleChange}
                     placeholder="000.000.000-00"
                   />
-                  {errors.cpf ? (
-                    <span className="text-sm text-red-500">{errors.cpf}</span>
-                  ) : null}
+                  {errors.cpf ? <ErrorBadge message={errors.cpf} /> : null}
                 </label>
 
                 <label className="space-y-2">
@@ -472,9 +488,7 @@ export const ClientForm = ({
                     onChange={handleChange}
                   />
                   {errors.data_nascimento ? (
-                    <span className="text-sm text-red-500">
-                      {errors.data_nascimento}
-                    </span>
+                    <ErrorBadge message={errors.data_nascimento} />
                   ) : null}
                 </label>
 
@@ -495,9 +509,7 @@ export const ClientForm = ({
                     <option value="outro">Outro</option>
                   </select>
                   {errors.genero ? (
-                    <span className="text-sm text-red-500">
-                      {errors.genero}
-                    </span>
+                    <ErrorBadge message={errors.genero} />
                   ) : null}
                 </label>
 
@@ -517,9 +529,7 @@ export const ClientForm = ({
                     <option value="cartao_credito">Cartão de crédito</option>
                   </select>
                   {errors.forma_pagamento_preferida ? (
-                    <span className="text-sm text-red-500">
-                      {errors.forma_pagamento_preferida}
-                    </span>
+                    <ErrorBadge message={errors.forma_pagamento_preferida} />
                   ) : null}
                 </label>
 
@@ -550,14 +560,10 @@ export const ClientForm = ({
                     </Button>
                   </div>
                   {locationError ? (
-                    <span className="text-sm text-red-500">
-                      {locationError}
-                    </span>
+                    <ErrorBadge message={locationError} />
                   ) : null}
                   {errors.localizacao_inicial ? (
-                    <span className="text-sm text-red-500">
-                      {errors.localizacao_inicial}
-                    </span>
+                    <ErrorBadge message={errors.localizacao_inicial} />
                   ) : null}
                 </label>
               </div>
@@ -577,7 +583,7 @@ export const ClientForm = ({
                     placeholder="Digite sua senha"
                   />
                   {hasAttemptedSubmitStep2 && errors.senha ? (
-                    <span className="text-sm text-red-500">{errors.senha}</span>
+                    <ErrorBadge message={errors.senha} />
                   ) : null}
                 </label>
 
@@ -593,9 +599,7 @@ export const ClientForm = ({
                     placeholder="Repita a senha"
                   />
                   {hasAttemptedSubmitStep2 && errors.confirmar_senha ? (
-                    <span className="text-sm text-red-500">
-                      {errors.confirmar_senha}
-                    </span>
+                    <ErrorBadge message={errors.confirmar_senha} />
                   ) : null}
                 </label>
 

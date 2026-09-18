@@ -53,13 +53,13 @@ export const EstablishmentModal = ({
 
   return (
     <div
-      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
+      className={`auth-modal-overlay fixed inset-0 z-50 flex items-center justify-center overflow-hidden overscroll-none bg-slate-950/60 px-3 py-4 backdrop-blur-sm sm:px-4 ${
         isClosing ? "auth-modal-overlay-exit" : "auth-modal-overlay-enter"
       }`}
       onClick={onClose}
     >
       <div
-        className={`auth-modal-panel flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ${
+        className={`auth-modal-panel flex max-h-[calc(100dvh-2rem)] min-h-0 w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ${
           isClosing ? "auth-modal-panel-exit" : "auth-modal-panel-enter"
         }`}
         onClick={(event) => event.stopPropagation()}
@@ -98,7 +98,7 @@ export const EstablishmentModal = ({
           </div>
         </div>
 
-        <div className="scrollbar-none overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6">
+        <div className="scrollbar-none min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-6">
           <Form
             onLoginSuccess={(session) => {
               onLoginSuccess(session);

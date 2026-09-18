@@ -460,6 +460,10 @@ const parseUserSession = (
       typeof data.token_type === "string" ? data.token_type : "bearer",
     foto_perfil_url:
       typeof data.foto_perfil_url === "string" ? data.foto_perfil_url : null,
+    tipo_pessoa:
+      data.tipo_pessoa === "autonomo" || data.tipo_pessoa === "juridica"
+        ? data.tipo_pessoa
+        : undefined,
   };
 };
 

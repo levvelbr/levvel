@@ -47,6 +47,10 @@ export const getStoredSession = (): UserSession | null => {
         typeof parsed.foto_perfil_url === "string"
           ? parsed.foto_perfil_url
           : null,
+      tipo_pessoa:
+        parsed.tipo_pessoa === "autonomo" || parsed.tipo_pessoa === "juridica"
+          ? parsed.tipo_pessoa
+          : undefined,
     };
   } catch {
     return null;

@@ -1,13 +1,15 @@
-import { useEffect, useState, type HTMLAttributes } from "react";
+import { useEffect, useRef, useState, type HTMLAttributes } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, LoaderCircle, Menu, Search, X } from "lucide-react";
 import SearchBar from "./SearchBar";
+import type { EstablishmentPersonType } from "../types/auth";
 
 interface HeaderProps extends HTMLAttributes<HTMLElement> {
   onOpenMenu: () => void;
   loggedClientName: string | null;
   loggedClientPhotoUrl?: string | null;
   loggedClientRole?: "cliente" | "estabelecimento" | null;
+  loggedClientPersonType?: EstablishmentPersonType;
   onOpenLogin: () => void;
   onLogout: () => void;
   showSearchBar?: boolean;
@@ -32,16 +34,19 @@ const ROLE_LABELS: Record<"cliente" | "estabelecimento", string> = {
 interface UserMenuHeaderProps {
   name: string;
   role?: "cliente" | "estabelecimento" | null;
+  personType?: EstablishmentPersonType;
 }
 
-const UserMenuHeader = ({ name, role }: UserMenuHeaderProps) => (
+const UserMenuHeader = ({ name, role, personType }: UserMenuHeaderProps) => (
   <div className="mb-2 border-b border-slate-100 px-3 pb-2">
     <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
     {role ? (
       <span
-        className={`text-xs font-medium ${role === "estabelecimento" ? "text-blue-700" : "text-emerald-700"}`}
+        className={`whitespace-nowrap text-xs font-medium ${role === "estabelecimento" ? "text-blue-700" : "text-emerald-700"}`}
       >
-        {ROLE_LABELS[role]}
+        {role === "estabelecimento" && personType === "autonomo"
+          ? "Estabelecimento autônomo"
+          : ROLE_LABELS[role]}
       </span>
     ) : null}
   </div>
@@ -132,6 +137,7 @@ export const Header = ({
   loggedClientName,
   loggedClientPhotoUrl,
   loggedClientRole,
+  loggedClientPersonType,
   onOpenLogin,
   onLogout,
   showSearchBar = false,
@@ -143,6 +149,7 @@ export const Header = ({
 }: HeaderProps) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const isProvider = loggedClientRole === "estabelecimento";
   const isMobileSearchVisible =
     isMobileSearchOpen || (hideMobileSearchToggle && showSearchBar);
@@ -151,6 +158,26 @@ export const Header = ({
     setIsMobileSearchOpen((current) => !current);
     setIsUserMenuOpen(false);
   };
+
+  useEffect(() => {
+    if (!isUserMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+
+      if (target instanceof Node && !userMenuRef.current?.contains(target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [isUserMenuOpen]);
 
   return (
     <header
@@ -181,7 +208,7 @@ export const Header = ({
 
             <div className="flex items-center justify-end gap-2">
               {loggedClientName ? (
-                <div className="relative">
+                <div ref={userMenuRef} className="relative">
                   <button
                     type="button"
                     onClick={() => setIsUserMenuOpen((prev) => !prev)}
@@ -211,10 +238,11 @@ export const Header = ({
                   </button>
 
                   {isUserMenuOpen ? (
-                    <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                    <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                       <UserMenuHeader
                         name={loggedClientName}
                         role={loggedClientRole}
+                        personType={loggedClientPersonType}
                       />
                       <Link
                         to={
@@ -294,7 +322,7 @@ export const Header = ({
               />
 
               {loggedClientName ? (
-                <div className="relative shrink-0">
+                <div ref={userMenuRef} className="relative shrink-0">
                   <button
                     type="button"
                     onClick={() => setIsUserMenuOpen((prev) => !prev)}
@@ -310,10 +338,11 @@ export const Header = ({
                   </button>
 
                   {isUserMenuOpen ? (
-                    <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                    <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                       <UserMenuHeader
                         name={loggedClientName}
                         role={loggedClientRole}
+                        personType={loggedClientPersonType}
                       />
                       <Link
                         to={
@@ -404,7 +433,7 @@ export const Header = ({
 
           <div className="flex items-center justify-end gap-2">
             {loggedClientName ? (
-              <div className="relative">
+              <div ref={userMenuRef} className="relative">
                 <button
                   type="button"
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
@@ -423,10 +452,11 @@ export const Header = ({
                 </button>
 
                 {isUserMenuOpen ? (
-                  <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                  <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
                     <UserMenuHeader
                       name={loggedClientName}
                       role={loggedClientRole}
+                      personType={loggedClientPersonType}
                     />
                     <Link
                       to={

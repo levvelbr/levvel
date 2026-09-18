@@ -127,6 +127,11 @@ export const LoginForm = ({
           typeof responseData.foto_perfil_url === "string"
             ? responseData.foto_perfil_url
             : null,
+        tipo_pessoa:
+          responseData.tipo_pessoa === "autonomo" ||
+          responseData.tipo_pessoa === "juridica"
+            ? responseData.tipo_pessoa
+            : undefined,
       };
 
       onLoginSuccess(session);

@@ -596,6 +596,7 @@ export const ProfilePage = ({
           loggedClientName={session.nome}
           loggedClientPhotoUrl={session.foto_perfil_url ?? null}
           onOpenLogin={() => setIsAuthModalOpen(true)}
+          loggedClientPersonType={session?.tipo_pessoa}
           onLogout={() => {
             logout();
             navigate("/");

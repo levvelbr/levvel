@@ -1,13 +1,19 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from supabase_auth import datetime
+# from supabase_auth import datetime
 from app.schemas import estabelecimento
 from app.schemas.estabelecimento import EstabelecimentoCreate, EstabelecimentoResponse, EstabelecimentoUpdate, EstabelecimentoPerfilResponse
-from app.core.config import supabase_client
+from app.core.config import supabase_client, settings
 from postgrest.exceptions import APIError
 from typing import List, Optional
 from app.core.security import gerar_hash_senha, get_usuario_logado
+from fastapi.responses import RedirectResponse
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+
+import secrets
 
 router = APIRouter()
 
@@ -139,6 +145,191 @@ async def listar_estabelecimentos(categoria: Optional[str] = None):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao buscar estabelecimentos: {error.message}"
         )
+        
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar.events"
+]
+
+
+def criar_google_flow():
+    return Flow.from_client_config(
+        {
+            "web": {
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+            }
+        },
+        scopes=SCOPES,
+        redirect_uri=settings.GOOGLE_REDIRECT_URI,
+    )
+
+
+@router.get("/google-calendar/conectar")
+async def conectar_google_calendar(
+    usuario_logado: dict = Depends(get_usuario_logado)
+):
+    estabelecimento_id = (
+        usuario_logado.get("sub")
+        or usuario_logado.get("id")
+    )
+
+    role = usuario_logado.get("role")
+
+    if role != "estabelecimento":
+        raise HTTPException(
+            status_code=403,
+            detail="Apenas estabelecimentos podem conectar o Google Calendar."
+        )
+
+    if not estabelecimento_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Estabelecimento não identificado."
+        )
+
+    state = secrets.token_urlsafe(32)
+
+    # PKCE
+    code_verifier = secrets.token_urlsafe(64)
+
+    flow = criar_google_flow()
+
+    flow.code_verifier = code_verifier
+
+    supabase_client.table(
+        "estabelecimentos"
+    ).update({
+        "google_oauth_state": state,
+        "google_code_verifier": code_verifier
+    }).eq(
+        "id",
+        estabelecimento_id
+    ).execute()
+
+    authorization_url, _ = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+        state=state
+    )
+
+    print("URL GOOGLE:")
+    print(authorization_url)
+
+    return {
+        "authorization_url": authorization_url
+    }
+
+
+@router.get("/google-calendar/callback")
+async def google_calendar_callback(
+    code: str,
+    state: str
+):
+    resposta = (
+        supabase_client
+        .table("estabelecimentos")
+        .select(
+            "id, email, google_oauth_state, google_code_verifier"
+        )
+        .eq("google_oauth_state", state)
+        .execute()
+    )
+
+    if not resposta.data:
+        raise HTTPException(
+            status_code=400,
+            detail="State OAuth inválido ou expirado."
+        )
+
+    estabelecimento = resposta.data[0]
+
+    estabelecimento_id = estabelecimento["id"]
+
+    code_verifier = estabelecimento.get(
+        "google_code_verifier"
+    )
+
+    if not code_verifier:
+        raise HTTPException(
+            status_code=400,
+            detail="Code verifier OAuth não encontrado."
+        )
+
+    flow = criar_google_flow()
+
+    flow.code_verifier = code_verifier
+
+    try:
+        flow.fetch_token(
+            code=code
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Erro ao obter autorização Google: "
+                f"{str(error)}"
+            )
+        )
+
+    credentials = flow.credentials
+
+    if not credentials.refresh_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Google não retornou refresh_token."
+        )
+
+    # Não precisamos consultar calendars().get().
+    # Para o MVP usamos o e-mail do estabelecimento.
+    google_calendar_email = estabelecimento["email"]
+
+    resposta_update = (
+        supabase_client
+        .table("estabelecimentos")
+        .update({
+            "google_refresh_token":
+                credentials.refresh_token,
+
+            "google_calendar_conectado":
+                True,
+
+            "google_calendar_email":
+                google_calendar_email,
+
+            "google_oauth_state":
+                None,
+
+            "google_code_verifier":
+                None,
+        })
+        .eq(
+            "id",
+            estabelecimento_id
+        )
+        .execute()
+    )
+
+    if not resposta_update.data:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Autorização Google obtida, "
+                "mas não foi possível salvar a conexão."
+            )
+        )
+
+    return {
+        "message":
+            "Google Calendar conectado com sucesso.",
+
+        "google_calendar_email":
+            google_calendar_email
+    }
         
 @router.get("/{estabelecimento_id}", response_model=EstabelecimentoResponse)
 async def obter_perfil_estabelecimento(estabelecimento_id: str, usuario_logado: dict = Depends(get_usuario_logado)):

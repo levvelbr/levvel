@@ -32,72 +32,247 @@ async def criar_solicitacao_agendamento(agendamento: AgendamentoCreate):
         raise HTTPException(status_code=400, detail=f"Erro no Supabase: {error.message}")
 
 
-@router.patch("/{agendamento_id}/status", response_model=AgendamentoResponse)
-async def atualizar_status_agendamento(agendamento_id: str, status_update: AgendamentoStatusUpdate):
+@router.patch(
+    "/{agendamento_id}/status",
+    response_model=AgendamentoResponse
+)
+async def atualizar_status_agendamento(
+    agendamento_id: str,
+    status_update: AgendamentoStatusUpdate
+):
     """
-    Atualiza o estado do agendamento (Ex: Aceitar -> 'confirmado', Recusar -> 'recusado', 
-    Iniciar -> 'em_andamento', Cancelar -> 'cancelado').
+    Atualiza o status do agendamento.
+
+    Ao confirmar:
+    - verifica conexão com Google Calendar;
+    - cria o evento;
+    - salva google_event_id;
+    - confirma o agendamento.
     """
+
     try:
-        # 1. Prepara os dados de atualização incluindo motivo_recusa se fornecido
-        dados_atualizacao = {"status": status_update.status}
-        if status_update.motivo_recusa:
-            dados_atualizacao["motivo_recusa"] = status_update.motivo_recusa
 
-        # 2. Atualiza e retorna o agendamento no Supabase
-        resposta = supabase_client.table("agendamentos")\
-            .update(dados_atualizacao)\
-            .eq("id", agendamento_id)\
-            .execute()
-            
-        if not resposta.data:
-            raise HTTPException(status_code=404, detail="Agendamento não encontrado.")
+        # =====================================================
+        # CONFIRMAÇÃO
+        # =====================================================
 
-        agendamento = resposta.data[0]
-
-        # 3. Dispara a criação no Google Calendar apenas se for 'confirmado'
         if status_update.status == "confirmado":
-            try:
-                # Busca informações estendidas do cliente e estabelecimento usando o Supabase
-                agendamento_detalhado = supabase_client.table("agendamentos")\
-                    .select("*, clientes(email, nome_usuario), estabelecimentos(email, nome_estabelecimento, google_refresh_token)")\
-                    .eq("id", agendamento_id)\
-                    .single()\
-                    .execute()
 
-                dados_relacionados = agendamento_detalhado.data
-                cliente = dados_relacionados.get("clientes")
-                estabelecimento = dados_relacionados.get("estabelecimentos")
-
-                # Se o estabelecimento tiver a conta do Google conectada (Refresh Token salvo)
-                if estabelecimento and estabelecimento.get("google_refresh_token"):
-                    google_event_id = criar_agendamento(
-                        refresh_token=estabelecimento["google_refresh_token"],
-                        client_id=settings.GOOGLE_CLIENT_ID,
-                        client_secret=settings.GOOGLE_CLIENT_SECRET,
-                        resumo=f"{agendamento['tratamento']} - {estabelecimento['nome_estabelecimento']}",
-                        descricao=f"Agendamento confirmado via Levvel.\nProfissional: {agendamento.get('profissional_envolvido', 'N/A')}",
-                        data_hora_inicio=agendamento["data_hora_inicio"],
-                        duracao_minutos=agendamento.get("duracao_estimada_minutos", 45),
-                        email_cliente=cliente["email"],
-                        email_estabelecimento=estabelecimento["email"]
+            resposta = (
+                supabase_client
+                .table("agendamentos")
+                .select(
+                    """
+                    *,
+                    clientes(
+                        email,
+                        nome_usuario
+                    ),
+                    estabelecimentos(
+                        email,
+                        nome_estabelecimento,
+                        localizacao,
+                        google_refresh_token,
+                        google_calendar_conectado
                     )
+                    """
+                )
+                .eq("id", agendamento_id)
+                .single()
+                .execute()
+            )
 
-                    # Salva o google_event_id retornado na tabela de agendamentos para controle futuro
-                    supabase_client.table("agendamentos")\
-                        .update({"google_event_id": google_event_id})\
-                        .eq("id", agendamento_id)\
-                        .execute()
+            if not resposta.data:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Agendamento não encontrado."
+                )
 
-            except Exception as calendar_err:
-                # Trata a exceção em log sem interromper a resposta da API ao frontend
-                logger.error(f"Erro na sincronização do Google Calendar: {str(calendar_err)}")
+            agendamento = resposta.data
 
-        return agendamento
+            cliente = agendamento.get("clientes")
+            estabelecimento = agendamento.get(
+                "estabelecimentos"
+            )
+
+            if not cliente:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cliente do agendamento não encontrado."
+                )
+
+            if not estabelecimento:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Estabelecimento do agendamento não encontrado."
+                )
+
+            # =================================================
+            # GOOGLE CALENDAR
+            # =================================================
+
+            if (
+                not estabelecimento.get(
+                    "google_calendar_conectado"
+                )
+                or not estabelecimento.get(
+                    "google_refresh_token"
+                )
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "GOOGLE_CALENDAR_NOT_CONNECTED",
+                        "message": (
+                            "Conecte sua conta Google "
+                            "antes de confirmar o agendamento."
+                        )
+                    }
+                )
+
+            # =================================================
+            # CONVERTE DATA
+            # =================================================
+
+            from datetime import datetime
+
+            data_inicio = agendamento[
+                "data_hora_inicio"
+            ]
+
+            if isinstance(data_inicio, str):
+                data_inicio = datetime.fromisoformat(
+                    data_inicio.replace(
+                        "Z",
+                        "+00:00"
+                    )
+                )
+
+            # =================================================
+            # CRIA EVENTO GOOGLE
+            # =================================================
+
+            try:
+
+                evento_google = criar_agendamento(
+                    refresh_token=estabelecimento[
+                        "google_refresh_token"
+                    ],
+
+                    client_id=settings.GOOGLE_CLIENT_ID,
+                    client_secret=settings.GOOGLE_CLIENT_SECRET,
+
+                    resumo=(
+                        f"{agendamento['tratamento']} - "
+                        f"{estabelecimento['nome_estabelecimento']}"
+                    ),
+
+                    descricao=(
+                        "Agendamento confirmado via Levvel.\n"
+                        f"Cliente: {cliente['nome_usuario']}\n"
+                        f"Profissional: "
+                        f"{agendamento.get('profissional_envolvido', 'N/A')}"
+                    ),
+
+                    localizacao=estabelecimento[
+                        "localizacao"
+                    ],
+
+                    data_inicio=data_inicio,
+
+                    duracao_minutos=agendamento.get(
+                        "duracao_estimada_minutos",
+                        45
+                    ),
+
+                    email_cliente=cliente["email"],
+
+                    email_estabelecimento=estabelecimento[
+                        "email"
+                    ],
+                )
+
+            except Exception as calendar_error:
+
+                logger.error(
+                    "Erro Google Calendar: %s",
+                    str(calendar_error)
+                )
+
+                raise HTTPException(
+                    status_code=502,
+                    detail={
+                        "code": "GOOGLE_CALENDAR_ERROR",
+                        "message": (
+                            "Não foi possível registrar o "
+                            "agendamento no Google Calendar."
+                        )
+                    }
+                )
+
+            # =================================================
+            # GOOGLE OK → CONFIRMA
+            # =================================================
+
+            dados_atualizacao = {
+                "status": "confirmado",
+                "google_event_id": evento_google["id"],
+            }
+
+            resposta_update = (
+                supabase_client
+                .table("agendamentos")
+                .update(dados_atualizacao)
+                .eq("id", agendamento_id)
+                .execute()
+            )
+
+            if not resposta_update.data:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Erro ao confirmar agendamento."
+                )
+
+            return resposta_update.data[0]
+
+        # =====================================================
+        # OUTROS STATUS
+        # =====================================================
+
+        dados_atualizacao = {
+            "status": status_update.status
+        }
+
+        if status_update.motivo_recusa:
+            dados_atualizacao[
+                "motivo_recusa"
+            ] = status_update.motivo_recusa
+
+        resposta = (
+            supabase_client
+            .table("agendamentos")
+            .update(dados_atualizacao)
+            .eq("id", agendamento_id)
+            .execute()
+        )
+
+        if not resposta.data:
+            raise HTTPException(
+                status_code=404,
+                detail="Agendamento não encontrado."
+            )
+
+        return resposta.data[0]
+
+    except HTTPException:
+        raise
 
     except APIError as error:
-        raise HTTPException(status_code=400, detail=f"Erro no Supabase: {error.message}")
-
+        raise HTTPException(
+            status_code=400,
+            detail=f"Erro no Supabase: {error.message}"
+        )
+        
 @router.post("/{agendamento_id}/encerrar", response_model=AgendamentoResponse)
 async def encerrar_tratamento(
     agendamento_id: str, 

@@ -131,14 +131,6 @@ class EstabelecimentoUpdate(BaseModel):
 
     horario_funcionamento: Optional[Dict[str, Any]] = None
 
-    @field_validator("*", mode="before")
-    @classmethod
-    def empty_string_to_none(cls, v):
-        if isinstance(v, str) and v.strip() == "":
-            return None
-
-        return v
-
 
 class EstabelecimentoPerfilResponse(BaseModel):
     id: str = Field(

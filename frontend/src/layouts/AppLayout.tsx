@@ -49,8 +49,8 @@ export const AppLayout = () => {
               <button
                 type="button"
                 onClick={() => {
+                  navigate("/", { replace: true, state: null });
                   logout();
-                  navigate("/");
                 }}
                 className="rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-700"
               >

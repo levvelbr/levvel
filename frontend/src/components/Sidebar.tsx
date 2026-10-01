@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Calendar,
+  Handshake,
   Home,
   LogIn,
   LogOut,
@@ -26,9 +27,9 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
     session?.role === "estabelecimento" ? "Minha agenda" : "Meus agendamentos";
 
   const handleLogout = () => {
+    navigate("/", { replace: true, state: null });
     logout();
     onClose();
-    navigate("/");
   };
 
   const getNavigationClassName = (isActive: boolean) =>
@@ -165,6 +166,27 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
               Serviços
             </Link>
           ) : null}
+
+          {session?.role !== "estabelecimento" ? (
+            <Link
+              to="/sou-prestador"
+              onClick={onClose}
+              className={getNavigationClassName(
+                location.pathname === "/sou-prestador",
+              )}
+            >
+              <Handshake
+                className={`h-5 w-5 ${
+                  location.pathname === "/sou-prestador"
+                    ? "text-slate-700 "
+                    : "text-slate-500"
+                }`}
+                strokeWidth={`${location.pathname === "/sou-prestador" ? 2 : 1.5}`}
+              />
+              Sou Prestador
+            </Link>
+          ) : null}
+
           <Link
             to="/contato"
             onClick={onClose}

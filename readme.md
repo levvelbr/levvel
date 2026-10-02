@@ -74,7 +74,8 @@ frontend/
 │
 ├── src/
 │   ├── assets/
-│   │   ├── hero.png
+│   │   ├── 20251226_LevveL-LogoMarca_7.ico
+│   │   ├── Gemini_Generated_Image_dgzupbdgzupbdgzu-removebg-preview.png
 │   │   └── TERMOS DE USO E POLÍTICA DE PRIVACIDADE.pdf
 │   │
 │   ├── components/

@@ -18,9 +18,11 @@ import type { EstablishmentPersonType, UserSession } from "../types/auth";
 interface AuthContextValue {
   session: UserSession | null;
   isAuthenticated: boolean;
+  isLoggingOut: boolean;
   login: (nextSession: UserSession) => void;
   updateSession: (nextSession: Partial<UserSession>) => void;
   logout: () => void;
+  completeLogout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -33,6 +35,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<UserSession | null>(() =>
     getStoredSession(),
   );
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     const syncSession = () => {
@@ -97,6 +100,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const value = useMemo<AuthContextValue>(() => {
     const login = (nextSession: UserSession) => {
+      setIsLoggingOut(false);
       setStoredSession(nextSession);
       setSession(nextSession);
     };
@@ -126,18 +130,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     const logout = () => {
+      setIsLoggingOut(true);
       clearStoredSession();
       setSession(null);
     };
 
+    const completeLogout = () => setIsLoggingOut(false);
+
     return {
       session,
       isAuthenticated: Boolean(session?.access_token),
+      isLoggingOut,
       login,
       updateSession,
       logout,
+      completeLogout,
     };
-  }, [session]);
+  }, [isLoggingOut, session]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

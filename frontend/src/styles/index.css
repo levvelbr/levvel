@@ -100,6 +100,26 @@ body {
   animation-delay: 160ms;
 }
 
+.fade-up-mount {
+  animation: mountFadeUp 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fade-up-mount-delay-1 {
+  animation-delay: 100ms;
+}
+
+.fade-up-mount-delay-2 {
+  animation-delay: 200ms;
+}
+
+.fade-up-mount-delay-3 {
+  animation-delay: 300ms;
+}
+
+.fade-up-mount-delay-4 {
+  animation-delay: 400ms;
+}
+
 @keyframes authModalOverlayIn {
   from {
     opacity: 0;
@@ -207,6 +227,11 @@ body {
   .establishment-mount,
   .establishment-mount-delay-1,
   .establishment-mount-delay-2,
+  .fade-up-mount,
+  .fade-up-mount-delay-1,
+  .fade-up-mount-delay-2,
+  .fade-up-mount-delay-3,
+  .fade-up-mount-delay-4,
   .auth-modal-overlay,
   .auth-modal-panel,
   .auth-modal-content-enter,

@@ -6,9 +6,11 @@ import { EstablishmentPublicPage } from "./pages/EstablishmentPublicPage";
 import { ContactPage } from "./pages/ContactPage";
 import { HomePage } from "./pages/HomePage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { ProviderSignupPage } from "./pages/ProviderSignupPage";
 import { ServicesPage } from "./pages/ServicesPage";
 import { TermsPrivacyPage } from "./pages/TermsPrivacyPage";
 import { UnauthorizedPage } from "./pages/UnauthorizedPage";
+import { GuestOrClientRoute } from "./routes/GuestOrClientRoute";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 
 export const App = () => {
@@ -22,10 +24,15 @@ export const App = () => {
               <Route path="/servicos" element={<ServicesPage />} />
               <Route path="/contato" element={<ContactPage />} />
               <Route path="/login" element={<Navigate to="/" replace />} />
-              <Route
-                path="/estabelecimentos/:id"
-                element={<EstablishmentPublicPage />}
-              />
+
+              <Route element={<GuestOrClientRoute />}>
+                <Route path="/sou-prestador" element={<ProviderSignupPage />} />
+                <Route
+                  path="/estabelecimentos/:id"
+                  element={<EstablishmentPublicPage />}
+                />
+              </Route>
+
               <Route
                 path="/termos-e-privacidade"
                 element={<TermsPrivacyPage />}
@@ -33,7 +40,13 @@ export const App = () => {
               <Route path="/nao-autorizado" element={<UnauthorizedPage />} />
 
               <Route element={<ProtectedRoute />}>
-                <Route path="/perfil" element={<ProfilePage />} />
+                <Route
+                  element={
+                    <GuestOrClientRoute redirectTo="/?providerTab=profile" />
+                  }
+                >
+                  <Route path="/perfil" element={<ProfilePage />} />
+                </Route>
               </Route>
 
               <Route path="*" element={<Navigate to="/" replace />} />

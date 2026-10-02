@@ -11,10 +11,13 @@ import {
 } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
+  Calendar,
   CalendarDays,
   Check,
   CircleUser,
   IdCardLanyard,
+  Loader2,
   Maximize2,
   Play,
   X,
@@ -154,13 +157,25 @@ const formatBookingDate = (iso: string) => {
   });
 };
 
+const GOOGLE_CALENDAR_PENDING_KEY = "googleCalendarConnecting";
+const getGoogleCalendarStorageKey = (establishmentId: string) =>
+  `googleCalendarConnected:${establishmentId}`;
+
 export const DashboardLayout = ({
   children,
   variant = "home",
 }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { session, isAuthenticated, login, logout, updateSession } = useAuth();
+  const {
+    session,
+    isAuthenticated,
+    isLoggingOut,
+    login,
+    logout,
+    completeLogout,
+    updateSession,
+  } = useAuth();
   const isProviderView = isAuthenticated && session?.role === "estabelecimento";
   const providerTab = new URLSearchParams(location.search).get("providerTab");
   const isServicesPage = variant === "services";
@@ -186,6 +201,13 @@ export const DashboardLayout = ({
   const [providerStatusUpdating, setProviderStatusUpdating] = useState<
     string | null
   >(null);
+  const [isGoogleCalendarConnected, setIsGoogleCalendarConnected] =
+    useState(false);
+  const [isConnectingGoogleCalendar, setIsConnectingGoogleCalendar] =
+    useState(false);
+  const [googleCalendarError, setGoogleCalendarError] = useState<string | null>(
+    null,
+  );
   const fixedSearchRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -266,6 +288,58 @@ export const DashboardLayout = ({
   }, [isProviderView, session?.id]);
 
   useEffect(() => {
+    if (!isProviderView || !session?.id) {
+      setIsGoogleCalendarConnected(false);
+      return;
+    }
+
+    const pendingEstablishmentId = window.sessionStorage.getItem(
+      GOOGLE_CALENDAR_PENDING_KEY,
+    );
+
+    if (pendingEstablishmentId === session.id) {
+      window.sessionStorage.removeItem(GOOGLE_CALENDAR_PENDING_KEY);
+      window.localStorage.setItem(
+        getGoogleCalendarStorageKey(session.id),
+        "true",
+      );
+    }
+
+    setIsGoogleCalendarConnected(
+      window.localStorage.getItem(getGoogleCalendarStorageKey(session.id)) ===
+        "true",
+    );
+  }, [isProviderView, session?.id]);
+
+  const handleConnectGoogleCalendar = async () => {
+    if (!session?.id) {
+      return;
+    }
+
+    setIsConnectingGoogleCalendar(true);
+    setGoogleCalendarError(null);
+
+    try {
+      const response = await api.get(
+        "/v1/estabelecimentos/google-calendar/conectar",
+      );
+      const data = response.data as { authorization_url?: string };
+
+      if (!data.authorization_url) {
+        throw new Error("URL de autorização não recebida.");
+      }
+
+      window.sessionStorage.setItem(GOOGLE_CALENDAR_PENDING_KEY, session.id);
+      window.location.href = data.authorization_url;
+    } catch {
+      setGoogleCalendarError(
+        "Não foi possível iniciar a conexão com o Google Calendar. Tente novamente.",
+      );
+      setIsConnectingGoogleCalendar(false);
+    }
+  };
+
+  useEffect(() => {
     if (!isAuthenticated || session?.role !== "cliente") {
       return;
     }
@@ -291,6 +365,11 @@ export const DashboardLayout = ({
   }, [isAuthenticated, session?.id, session?.role, updateSession]);
 
   useEffect(() => {
+    if (isLoggingOut && location.pathname === "/") {
+      completeLogout();
+      return;
+    }
+
     const state = location.state as {
       openLogin?: boolean;
     } | null;
@@ -299,7 +378,13 @@ export const DashboardLayout = ({
       setIsAuthModalOpen(true);
       navigate(location.pathname, { replace: true, state: null });
     }
-  }, [location.pathname, location.state, navigate]);
+  }, [
+    completeLogout,
+    isLoggingOut,
+    location.pathname,
+    location.state,
+    navigate,
+  ]);
 
   useEffect(() => {
     if (window.location.hash) {
@@ -624,8 +709,8 @@ export const DashboardLayout = ({
         loggedClientPersonType={session?.tipo_pessoa}
         onOpenLogin={() => setIsAuthModalOpen(true)}
         onLogout={() => {
+          navigate("/", { replace: true, state: null });
           logout();
-          navigate("/");
         }}
         showSearchBar={showHeaderSearch}
         searchQuery={searchQuery}
@@ -678,7 +763,55 @@ export const DashboardLayout = ({
         {isProviderView ? (
           <section className="bg-linear-to-b from-blue-50 to-white px-4 py-10 sm:py-14">
             <div className="mx-auto grid w-full max-w-5xl gap-6">
-              <EstablishmentNavigation />
+              <div className="flex flex-wrap items-center gap-3">
+                <EstablishmentNavigation />
+                {providerTab === "agenda" && isGoogleCalendarConnected ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                    <Check className="h-3.5 w-3.5" strokeWidth={2} />
+                    Sincronizado com Google Calendar
+                  </span>
+                ) : null}
+              </div>
+
+              {!isGoogleCalendarConnected ? (
+                <div className="flex flex-col gap-4 rounded-3xl border border-blue-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                      <Calendar className="h-5 w-5" strokeWidth={1.8} />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        Google Calendar
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">
+                        Autorize a Levvel a criar eventos na agenda Google deste
+                        estabelecimento.
+                      </p>
+                      {googleCalendarError ? (
+                        <p className="mt-1 text-xs font-medium text-rose-600">
+                          {googleCalendarError}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleConnectGoogleCalendar}
+                    disabled={isConnectingGoogleCalendar}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isConnectingGoogleCalendar ? (
+                      <Loader2
+                        className="h-4 w-4 animate-spin"
+                        strokeWidth={2}
+                      />
+                    ) : null}
+                    Conectar Google Calendar
+                  </button>
+                </div>
+              ) : null}
+
               {providerTab === "profile" || providerTab === "agenda" ? (
                 <ProfilePage
                   embedded
@@ -686,7 +819,7 @@ export const DashboardLayout = ({
                 />
               ) : null}
               {providerTab !== "profile" && providerTab !== "agenda" ? (
-                <div className="rounded-3xl border border-blue-200 bg-white p-6 shadow-sm sm:p-8">
+                <div className="fade-up-mount rounded-3xl border border-blue-200 bg-white p-6 shadow-sm sm:p-8">
                   <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
                     Painel do Prestador
                   </p>
@@ -703,10 +836,10 @@ export const DashboardLayout = ({
 
               {providerTab !== "profile" && providerTab !== "agenda" ? (
                 <>
-                  <div className="hidden gap-4 sm:grid-cols-2">
+                  <div className="fade-up-mount fade-up-mount-delay-1 hidden gap-4 sm:grid-cols-2">
                     <Link
                       to="/?providerTab=agenda"
-                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
+                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
                     >
                       <p className="text-sm font-semibold text-slate-900">
                         Agenda
@@ -719,7 +852,7 @@ export const DashboardLayout = ({
 
                     <Link
                       to="/?providerTab=profile"
-                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:bg-slate-50"
+                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
                     >
                       <p className="text-sm font-semibold text-slate-900">
                         Perfil
@@ -731,13 +864,21 @@ export const DashboardLayout = ({
                     </Link>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="fade-up-mount fade-up-mount-delay-2 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Agenda
-                        </p>
-                        <h2 className="text-lg font-semibold text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-semibold uppercase tracking-wide text-slate-900">
+                            Agenda
+                          </p>
+                          {isGoogleCalendarConnected ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                              <Check className="h-3 w-3" strokeWidth={2} />
+                              Sincronizado com Google Calendar
+                            </span>
+                          ) : null}
+                        </div>
+                        <h2 className="text-sm font-medium text-slate-500">
                           Próximos agendamentos
                         </h2>
                       </div>
@@ -890,19 +1031,29 @@ export const DashboardLayout = ({
             <div className="mx-auto w-full max-w-6xl">
               <div className="mb-8 grid gap-6 border-b border-emerald-100 sm:pb-8 pb-2 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:items-end">
                 <div>
-                  <p className="text-sm font-semibold text-emerald-700">
+                  <Link
+                    to="/"
+                    className="mb-5 inline-flex items-center gap-1.5 py-1 text-sm font-medium text-slate-600 transition-colors hover:text-emerald-700 hover:underline hover:underline-offset-4"
+                  >
+                    <ArrowLeft size={15} aria-hidden="true" />
+                    Voltar para início
+                  </Link>
+                  <p className="fade-up-mount text-sm font-semibold text-emerald-700">
                     Catálogo de serviços
                   </p>
-                  <h1 className="mt-2 text-3xl font-semibold text-emerald-950 sm:text-4xl">
+                  <h1 className="fade-up-mount fade-up-mount-delay-1 mt-2 text-3xl font-semibold text-emerald-950 sm:text-4xl">
                     Encontre o atendimento ideal
                   </h1>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+                  <p className="fade-up-mount fade-up-mount-delay-2 mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
                     Pesquise por serviço, estabelecimento, categoria ou
                     localização e compare os profissionais disponíveis.
                   </p>
                 </div>
 
-                <div ref={fixedSearchRef}>
+                <div
+                  className="fade-up-mount fade-up-mount-delay-2"
+                  ref={fixedSearchRef}
+                >
                   <SearchBar
                     value={searchQuery}
                     onSearch={setSearchQuery}
@@ -959,32 +1110,32 @@ export const DashboardLayout = ({
           <>
             <section className="bg-linear-to-b from-gray-100 to-white pt-20 pb-10">
               <div className="container mx-auto px-4 text-center">
-                <p className="inline-block bg-emerald-100 text-emerald-800 rounded-full px-3 py-1 text-sm mb-6">
+                <p className="fade-up-mount inline-block bg-emerald-100 text-emerald-800 rounded-full px-3 py-1 text-sm mb-6">
                   <span className="text-amber-500">✦</span> Leve uma vida Leve
                 </p>
 
-                <h1 className="text-4xl md:text-6xl font-serif font-semibold text-emerald-900 mb-4">
+                <h1 className="fade-up-mount fade-up-mount-delay-1 text-4xl md:text-6xl font-serif font-semibold text-emerald-900 mb-4">
                   Encontre o seu momento de{" "}
                   <span className="text-amber-500 italic">bem-estar</span>
                 </h1>
 
-                <p className="text-slate-600 max-w-2xl mx-auto mb-6">
+                <p className="fade-up-mount fade-up-mount-delay-2 text-slate-600 max-w-2xl mx-auto mb-6">
                   Conectamos voce aos melhores profissionais. Explore servicos e
                   conheca as descricoes de cada atendimento antes do login.
                 </p>
 
-                <div className="flex items-center justify-center gap-4">
+                <div className="fade-up-mount fade-up-mount-delay-3 flex items-center justify-center gap-4">
                   <button
                     type="button"
                     onClick={() => navigate("/servicos")}
-                    className="bg-emerald-700 text-white rounded-md px-6 py-3 hover:bg-emerald-800 cursor-pointer"
+                    className="bg-emerald-700 text-white rounded-md px-6 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-800 hover:shadow-lg cursor-pointer"
                   >
                     Explorar Serviços
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsEstablishmentModalOpen(true)}
-                    className="border border-emerald-700 text-emerald-700 rounded-md px-6 py-3 hover:bg-emerald-50 cursor-pointer"
+                    onClick={() => navigate("/sou-prestador")}
+                    className="border border-emerald-700 text-emerald-700 rounded-md px-6 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-50 cursor-pointer"
                   >
                     Sou Prestador
                   </button>
@@ -992,12 +1143,12 @@ export const DashboardLayout = ({
 
                 <div
                   ref={fixedSearchRef}
-                  className="mx-auto mt-8 max-w-5xl hidden md:block"
+                  className="fade-up-mount fade-up-mount-delay-4 mx-auto mt-8 max-w-5xl hidden md:block"
                 >
                   <SearchBar value={searchQuery} onSearch={setSearchQuery} />
                 </div>
 
-                <div className="mt-10 mb-5 mx-auto max-w-5/6">
+                <div className="fade-up-mount fade-up-mount-delay-4 mt-10 mb-5 mx-auto max-w-5/6">
                   <h2
                     className="text-2xl md:text-3xl font-serif font-semibold text-emerald-900 mb-2"
                     id="categories-title"

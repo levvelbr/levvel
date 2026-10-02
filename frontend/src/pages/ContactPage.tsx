@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail } from "lucide-react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthModal } from "../components/AuthModal";
 import { Header } from "../components/Header";
@@ -11,9 +11,6 @@ export const ContactPage = () => {
   const { session, login, logout } = useAuth();
   const isEstablishment = session?.role === "estabelecimento";
   const accentText = isEstablishment ? "text-blue-700" : "text-emerald-700";
-  const accentHoverText = isEstablishment
-    ? "hover:text-blue-800"
-    : "hover:text-emerald-800";
   const accentBorderHover = isEstablishment
     ? "hover:border-blue-300"
     : "hover:border-emerald-300";
@@ -35,8 +32,8 @@ export const ContactPage = () => {
         loggedClientPersonType={session?.tipo_pessoa}
         onOpenLogin={() => setIsAuthModalOpen(true)}
         onLogout={() => {
+          navigate("/", { replace: true, state: null });
           logout();
-          navigate("/");
         }}
       />
 
@@ -61,13 +58,14 @@ export const ContactPage = () => {
         <div className="mx-auto flex w-full max-w-4xl flex-col">
           <Link
             to="/"
-            className={`inline-flex items-center text-sm font-semibold ${accentText} ${accentHoverText}`}
+            className={`inline-flex items-center gap-1.5 py-1 text-sm font-medium text-slate-600 transition-colors ${isEstablishment ? "hover:text-blue-700" : "hover:text-emerald-700"} hover:underline hover:underline-offset-4`}
           >
-            Voltar para a home
+            <ArrowLeft className="h-[15px] w-[15px]" aria-hidden="true" />
+            Voltar para início
           </Link>
 
           <section
-            className={`mt-4 border-b ${isEstablishment ? "border-blue-100" : "border-emerald-100"} pb-5`}
+            className={`fade-up-mount mt-4 border-b ${isEstablishment ? "border-blue-100" : "border-emerald-100"} pb-5`}
           >
             <p className={`text-sm font-semibold ${accentText}`}>Contato</p>
             <h1
@@ -84,7 +82,7 @@ export const ContactPage = () => {
           <section className="mt-5 grid gap-3">
             <a
               href="mailto:levvel@mail.com"
-              className={`group flex flex-col justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-colors ${accentBorderHover} ${accentBackgroundHover}`}
+              className={`fade-up-mount fade-up-mount-delay-1 group flex flex-col justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${accentBorderHover} ${accentBackgroundHover}`}
             >
               <Mail className={`h-6 w-6 ${accentText}`} strokeWidth={1.8} />
               <div className="mt-5">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -62,6 +62,10 @@ export const EstablishmentPublicPage = () => {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const returnTo =
     (location.state as { returnTo?: string } | null)?.returnTo ?? "/";
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
 
   useEffect(() => {
     const fetchEstablishment = async () => {
@@ -143,8 +147,8 @@ export const EstablishmentPublicPage = () => {
           loggedClientPersonType={session?.tipo_pessoa}
           onOpenLogin={() => setIsAuthModalOpen(true)}
           onLogout={() => {
+            navigate("/", { replace: true, state: null });
             logout();
-            navigate("/");
           }}
         />
         <Sidebar
@@ -174,8 +178,8 @@ export const EstablishmentPublicPage = () => {
           loggedClientPersonType={session?.tipo_pessoa}
           onOpenLogin={() => setIsAuthModalOpen(true)}
           onLogout={() => {
+            navigate("/", { replace: true, state: null });
             logout();
-            navigate("/");
           }}
         />
         <Sidebar
@@ -212,8 +216,8 @@ export const EstablishmentPublicPage = () => {
         loggedClientPersonType={session?.tipo_pessoa}
         onOpenLogin={() => setIsAuthModalOpen(true)}
         onLogout={() => {
+          navigate("/", { replace: true, state: null });
           logout();
-          navigate("/");
         }}
       />
 

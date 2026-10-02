@@ -8,7 +8,7 @@ import {
   ClockFading,
   Contact,
   Filter,
-  Home,
+  ArrowLeft,
   RotateCcw,
   X,
 } from "lucide-react";
@@ -610,11 +610,12 @@ export const ProfilePage = ({
           onOpenMenu={() => setIsSidebarOpen(true)}
           loggedClientName={session.nome}
           loggedClientPhotoUrl={session.foto_perfil_url ?? null}
+          loggedClientRole={session.role}
           onOpenLogin={() => setIsAuthModalOpen(true)}
           loggedClientPersonType={session?.tipo_pessoa}
           onLogout={() => {
+            navigate("/", { replace: true, state: null });
             logout();
-            navigate("/");
           }}
         />
       ) : null}
@@ -643,38 +644,41 @@ export const ProfilePage = ({
               {isEstablishment ? <EstablishmentNavigation /> : null}
 
               {!isEstablishment ? (
-                <div className="flex w-fit gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+                <div className="flex flex-col items-start gap-2">
                   <Link
                     to="/"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
-                    aria-label="Voltar para a home"
+                    className="inline-flex items-center gap-1.5 py-1 text-sm font-medium text-slate-600 transition-colors hover:text-emerald-700 hover:underline hover:underline-offset-4"
                   >
-                    <Home className="h-5 w-5" strokeWidth={1.8} />
+                    <ArrowLeft
+                      className="h-[15px] w-[15px]"
+                      aria-hidden="true"
+                    />
+                    Voltar para início
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => handleChangeTab("profile")}
-                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                      activeTab === "profile"
-                        ? "bg-emerald-700 text-white"
-                        : "text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    Meu perfil
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleChangeTab("bookings")}
-                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                      activeTab === "bookings"
-                        ? "bg-emerald-700 text-white"
-                        : "text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    {session.role === "cliente"
-                      ? "Meus agendamentos"
-                      : "Agenda"}
-                  </button>
+                  <div className="flex w-fit gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => handleChangeTab("profile")}
+                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                        activeTab === "profile"
+                          ? "bg-emerald-700 text-white"
+                          : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      Meu perfil
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleChangeTab("bookings")}
+                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                        activeTab === "bookings"
+                          ? "bg-emerald-700 text-white"
+                          : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      Meus agendamentos
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>

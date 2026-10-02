@@ -2,7 +2,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 export const ProtectedRoute = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoggingOut } = useAuth();
   const location = useLocation();
 
   if (!isAuthenticated) {
@@ -10,10 +10,14 @@ export const ProtectedRoute = () => {
       <Navigate
         to="/"
         replace
-        state={{
-          from: `${location.pathname}${location.search}`,
-          openLogin: true,
-        }}
+        state={
+          isLoggingOut
+            ? null
+            : {
+                from: `${location.pathname}${location.search}`,
+                openLogin: true,
+              }
+        }
       />
     );
   }

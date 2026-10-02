@@ -1,6 +1,7 @@
 import { useEffect, useState, type HTMLAttributes } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, LoaderCircle, Menu, Search, X } from "lucide-react";
+import brandLogo from "../assets/Gemini_Generated_Image_dgzupbdgzupbdgzu-removebg-preview.png";
 import SearchBar from "./SearchBar";
 import type { EstablishmentPersonType } from "../types/auth";
 
@@ -113,20 +114,19 @@ const UserAvatar = ({
   );
 };
 
-const BrandLink = ({ isProvider = false }: { isProvider?: boolean }) => {
+const BrandLink = () => {
   return (
     <Link
       to="/"
       className="flex items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-slate-100"
       aria-label="Ir para a página inicial"
     >
-      <span
-        className={`flex h-8 w-8 items-center justify-center rounded-md bg-linear-to-br ${isProvider ? "from-blue-700 to-blue-500" : "from-emerald-700 to-emerald-500"} text-sm font-semibold text-white`}
-      >
-        L
-      </span>
-      <span className="text-lg font-semibold tracking-tight text-slate-800 hidden lg:block">
-        LevveL
+      <span className="h-11 w-11 overflow-hidden">
+        <img
+          src={brandLogo}
+          alt=""
+          className="h-full w-full translate-y-1 scale-[1.55] object-contain"
+        />
       </span>
     </Link>
   );
@@ -201,7 +201,7 @@ export const Header = ({
                   <Menu className="h-6 w-6" strokeWidth={1.5} />
                 </button>
 
-                <BrandLink isProvider={isProvider} />
+                <BrandLink />
               </div>
 
               <div />
@@ -411,7 +411,7 @@ export const Header = ({
                 <Menu className="h-6 w-6" strokeWidth={1.5} />
               </button>
 
-              <BrandLink isProvider={isProvider} />
+              <BrandLink />
             </div>
 
             <div className="hidden md:flex md:justify-center">

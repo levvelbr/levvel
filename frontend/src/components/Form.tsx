@@ -83,13 +83,7 @@ interface ViaCepResponse {
 }
 
 type WeekDayKey =
-  | "segunda"
-  | "terca"
-  | "quarta"
-  | "quinta"
-  | "sexta"
-  | "sabado"
-  | "domingo";
+  "segunda" | "terca" | "quarta" | "quinta" | "sexta" | "sabado" | "domingo";
 
 interface TimeRange {
   inicio: string;
@@ -660,6 +654,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
   ]);
   const [atendeEmDiferentesEstados, setAtendeEmDiferentesEstados] =
     useState(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const [isServiceLocationModalOpen, setIsServiceLocationModalOpen] =
     useState(false);
   const serviceLocationModalRef = useRef<HTMLDivElement | null>(null);
@@ -674,16 +669,16 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationInputMode, setLocationInputMode] =
     useState<LocationInputMode>("manual");
+  const [locationToggleThumb, setLocationToggleThumb] = useState({
+    left: 0,
+    width: 0,
+  });
   const [cepValue, setCepValue] = useState("");
   const [cepAddress, setCepAddress] = useState<ViaCepAddress | null>(null);
   const [cepNumero, setCepNumero] = useState("");
   const [cepComplemento, setCepComplemento] = useState("");
   const [isFetchingCep, setIsFetchingCep] = useState(false);
   const [cepError, setCepError] = useState<string | null>(null);
-  const [locationToggleThumb, setLocationToggleThumb] = useState({
-    left: 0,
-    width: 0,
-  });
   const cepModeButtonRef = useRef<HTMLButtonElement | null>(null);
   const manualModeButtonRef = useRef<HTMLButtonElement | null>(null);
   const scheduleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -821,10 +816,26 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       return;
     }
 
-    setLocationToggleThumb({
-      left: activeButton.offsetLeft,
-      width: activeButton.offsetWidth,
-    });
+    const updateThumb = () => {
+      const container = activeButton.parentElement;
+
+      if (!container) {
+        return;
+      }
+
+      const buttonRect = activeButton.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      setLocationToggleThumb({
+        left: buttonRect.left - containerRect.left - container.clientLeft,
+        width: buttonRect.width,
+      });
+    };
+
+    updateThumb();
+    window.addEventListener("resize", updateThumb);
+
+    return () => window.removeEventListener("resize", updateThumb);
   }, [locationInputMode, hasNoFixedLocation]);
 
   useEffect(() => {
@@ -1618,20 +1629,95 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     return newErrors;
   };
 
+  const scrollFormToTop = () => {
+    const formScroller =
+      formRef.current?.closest<HTMLElement>(".scrollbar-none");
+
+    if (formScroller) {
+      formScroller.scrollTop = 0;
+    }
+  };
+
+  const focusFirstError = (fieldErrors: FormErrors) => {
+    const fieldOrder = [
+      "nome_estabelecimento",
+      "responsavel",
+      "telefone",
+      "email",
+      "localizacao",
+      "cnpj",
+      "razao_social",
+      "categoria",
+      "instagram",
+      "profissionais_envolvidos",
+      "horario_funcionamento",
+      "senha_hash",
+      "confirmar_senha",
+      "termos_aceitos",
+    ];
+    const firstField = fieldOrder.find((field) =>
+      Object.prototype.hasOwnProperty.call(fieldErrors, field),
+    );
+
+    if (!firstField || !formRef.current) {
+      return;
+    }
+
+    const selectors = [
+      `[data-field="${firstField}"]`,
+      `[name="${firstField}"]:not([disabled])`,
+      `[aria-labelledby="${firstField}-label"]`,
+    ];
+    if (firstField === "localizacao") {
+      selectors.push('[name="cep"]');
+    }
+
+    window.requestAnimationFrame(() => {
+      const target = formRef.current?.querySelector<HTMLElement>(
+        selectors.join(","),
+      );
+
+      if (!target) {
+        return;
+      }
+
+      const scroller = formRef.current?.closest<HTMLElement>(".scrollbar-none");
+      const rect = target.getBoundingClientRect();
+      const scrollerRect = scroller?.getBoundingClientRect();
+      const topLimit = scrollerRect?.top ?? 0;
+      const bottomLimit = scrollerRect?.bottom ?? window.innerHeight;
+      const footerHeight =
+        formRef.current?.querySelector<HTMLElement>("[data-form-footer]")
+          ?.offsetHeight ?? 0;
+
+      if (
+        rect.top < topLimit + 8 ||
+        rect.bottom > bottomLimit - footerHeight - 8
+      ) {
+        target.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+
+      target.focus({ preventScroll: true });
+    });
+  };
+
   const handleNext = () => {
     const newErrors = validateStep(currentStep, values);
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
+      focusFirstError(newErrors);
       return;
     }
 
     setErrors({});
+    scrollFormToTop();
     setCurrentStep((prev) => prev + 1);
   };
 
   const handleBack = () => {
     setErrors({});
+    scrollFormToTop();
     setCurrentStep((prev) => prev - 1);
   };
 
@@ -1643,6 +1729,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) {
+      focusFirstError(newErrors);
       return;
     }
 
@@ -1733,9 +1820,10 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
   return (
     <form
+      ref={formRef}
       id="establishment-form"
       onSubmit={handleSubmit}
-      className="rounded-3xl bg-white/95 p-8 ring-1 ring-slate-200"
+      className="rounded-3xl bg-white/95 p-4 ring-1 ring-slate-200 sm:p-8"
     >
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
@@ -1786,11 +1874,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
         </div>
       ) : null}
 
-      <div
-        className={`grid gap-4 md:grid-cols-2 ${
-          isScheduleEditorOpen ? "pb-16" : ""
-        }`}
-      >
+      <div className="grid min-w-0 grid-cols-1 gap-4 [&>*]:min-w-0 md:grid-cols-2">
         {currentStep === 1 ? (
           <>
             <label className="space-y-2">
@@ -1878,10 +1962,10 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
               </span>
 
               {!hasNoFixedLocation ? (
-                <div className="relative mt-1 flex w-fit flex-wrap gap-1 rounded-full border border-slate-200 bg-slate-50 p-1 text-xs font-semibold">
+                <div className="relative mt-1 grid w-full grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold sm:w-fit sm:rounded-full">
                   <span
                     aria-hidden="true"
-                    className="absolute inset-y-1 rounded-full bg-emerald-700 shadow-sm transition-[left,width] duration-300 ease-in-out"
+                    className="pointer-events-none absolute inset-y-1 rounded-xl bg-emerald-700 shadow-sm transition-[left,width] duration-300 ease-in-out sm:rounded-full"
                     style={{
                       left: locationToggleThumb.left,
                       width: locationToggleThumb.width,
@@ -1891,7 +1975,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                     ref={cepModeButtonRef}
                     type="button"
                     onClick={() => handleLocationModeChange("cep")}
-                    className={`relative z-10 whitespace-nowrap rounded-full px-3 py-1.5 transition-colors duration-300 ${
+                    className={`relative z-10 min-w-0 rounded-xl px-2 py-2 text-center transition-colors duration-200 sm:whitespace-nowrap sm:rounded-full sm:px-3 sm:py-1.5 ${
                       locationInputMode === "cep"
                         ? "text-white"
                         : "text-slate-600 hover:text-emerald-700"
@@ -1903,7 +1987,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                     ref={manualModeButtonRef}
                     type="button"
                     onClick={() => handleLocationModeChange("manual")}
-                    className={`relative z-10 whitespace-nowrap rounded-full px-3 py-1.5 transition-colors duration-300 ${
+                    className={`relative z-10 min-w-0 rounded-xl px-2 py-2 text-center transition-colors duration-200 sm:whitespace-nowrap sm:rounded-full sm:px-3 sm:py-1.5 ${
                       locationInputMode === "manual"
                         ? "text-white"
                         : "text-slate-600 hover:text-emerald-700"
@@ -1989,7 +2073,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                 </div>
               )}
 
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <label className="flex min-w-0 items-start gap-2 text-sm text-slate-600">
                   <input
                     type="checkbox"
@@ -2008,7 +2092,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                     onClick={handleUseCurrentLocation}
                     disabled={isLocating}
                     aria-label="Usar minha localização"
-                    className="shrink-0 px-3 py-1.5 text-xs disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
+                    className="w-full shrink-0 px-3 py-1.5 text-xs disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
                   >
                     <LocateFixed
                       className="mr-1.5 h-3.5 w-3.5"
@@ -2024,7 +2108,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                     disabled
                     aria-label="Usar minha localização indisponível enquanto o atendimento sem local fixo estiver ativo"
                     title="Desmarque 'Não possuo local fixo de atendimento' para usar sua localização"
-                    className="shrink-0 px-3 py-1.5 text-xs disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
+                    className="w-full shrink-0 px-3 py-1.5 text-xs disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
                   >
                     <LocateFixed
                       className="mr-1.5 h-3.5 w-3.5"
@@ -2063,6 +2147,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                     type="button"
                     variant="outline"
                     onClick={openServiceLocationModal}
+                    data-field="localizacao"
                     className="mt-3 px-3 py-1.5 text-xs"
                   >
                     {serviceCities.some((item) => item.state && item.city)
@@ -2405,6 +2490,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                     type="button"
                     variant="outline"
                     onClick={openScheduleEditor}
+                    data-field="horario_funcionamento"
                     className="mt-4 px-3 py-1.5 text-xs"
                   >
                     {getCompactScheduleSummary().length
@@ -2483,29 +2569,24 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
         ) : null}
       </div>
 
-      {isScheduleEditorOpen && currentStep === 2 ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:px-6">
-          <div className="pointer-events-auto mx-auto max-w-2xl">
-            <Button
-              type="button"
-              onClick={handleSaveSchedule}
-              className="w-full"
-            >
-              Salvar horários
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:justify-between">
-          {currentStep > 1 ? (
-            <Button type="button" variant="outline" onClick={handleBack}>
-              Voltar
-            </Button>
-          ) : (
-            <div />
-          )}
+      <div
+        data-form-footer
+        className="sticky -bottom-4 z-30 -mx-4 -mb-4 mt-6 rounded-b-3xl border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur-sm sm:-bottom-6 sm:-mx-8 sm:-mb-8 sm:px-8 sm:py-4"
+      >
+        {isScheduleEditorOpen && currentStep === 2 ? (
+          <Button type="button" onClick={handleSaveSchedule} className="w-full">
+            Salvar horários
+          </Button>
+        ) : (
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+            {currentStep > 1 ? (
+              <Button type="button" variant="outline" onClick={handleBack}>
+                Voltar
+              </Button>
+            ) : (
+              <div />
+            )}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             {currentStep < 3 ? (
               <Button type="button" onClick={handleNext}>
                 Próximo
@@ -2516,8 +2597,8 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
               </Button>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {isServiceLocationModalRendered ? (
         <div

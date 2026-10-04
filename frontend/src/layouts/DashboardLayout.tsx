@@ -21,7 +21,6 @@ import {
   Maximize2,
   Play,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import { AuthModal } from "../components/AuthModal";
 import { useAuth } from "../contexts/AuthContext";
@@ -32,7 +31,11 @@ import { BookingModal } from "../components/BookingModal";
 import type { BookingEstablishment } from "../components/BookingForm";
 import SearchBar from "../components/SearchBar";
 import api from "../services/api";
-import { getCategoryIcon } from "../utils/categoryIcons";
+import {
+  CATEGORY_OPTIONS,
+  getCategoryColor,
+  getCategoryIcon,
+} from "../utils/categoryIcons";
 import { EstablishmentNavigation } from "../components/EstablishmentNavigation";
 import { ProfilePage } from "../pages/ProfilePage";
 
@@ -45,12 +48,6 @@ interface Establishment {
   id: string;
   categoria: string;
   ativo: boolean;
-}
-
-interface CategoryMeta {
-  name: string;
-  icon: LucideIcon;
-  color: string;
 }
 
 interface ProviderBooking {
@@ -482,43 +479,17 @@ export const DashboardLayout = ({
   };
 
   const serviceCategories = useMemo(() => {
-    const categories = Array.from(
-      new Set(
-        establishments
-          .map((item) => item.categoria?.trim())
-          .filter((value): value is string => Boolean(value)),
-      ),
-    ).sort((a, b) => a.localeCompare(b));
+    const availableCategories = new Set(
+      establishments.map((item) => item.categoria?.trim()),
+    );
 
-    const categoryStyles: Record<string, Omit<CategoryMeta, "icon">> = {
-      Beleza: { name: "Beleza", color: "from-pink-500 to-rose-500" },
-      "Bem-estar": {
-        name: "Bem-estar",
-        color: "from-emerald-500 to-teal-500",
-      },
-      Saúde: { name: "Saúde", color: "from-sky-500 to-cyan-500" },
-      Massagens: {
-        name: "Massagens",
-        color: "from-amber-500 to-orange-500",
-      },
-      Pets: { name: "Pets", color: "from-lime-500 to-green-500" },
-      Moda: {
-        name: "Moda",
-        color: "from-violet-500 to-fuchsia-500",
-      },
-    };
-
-    return categories.map((category) => {
-      const fallback = {
-        name: category,
-        color: "from-slate-500 to-slate-600",
-      };
-
-      return {
-        ...(categoryStyles[category] ?? fallback),
-        icon: getCategoryIcon(category),
-      };
-    });
+    return CATEGORY_OPTIONS.filter((category) =>
+      availableCategories.has(category),
+    ).map((category) => ({
+      name: category,
+      color: getCategoryColor(category),
+      icon: getCategoryIcon(category),
+    }));
   }, [establishments]);
 
   const toggleCategory = (categoryName: string) => {
@@ -547,10 +518,12 @@ export const DashboardLayout = ({
         selectedCategory?: string | null;
         searchQuery?: string;
         onRequestBooking?: (data: BookingEstablishment) => void;
+        onClearCategoryFilter?: () => void;
       }>,
       {
         selectedCategory: activeCategory,
         searchQuery,
+        onClearCategoryFilter: () => setActiveCategory(null),
         onRequestBooking: (est: BookingEstablishment) => {
           if (!isAuthenticated) {
             setPendingEstablishment(est);
@@ -1070,15 +1043,6 @@ export const DashboardLayout = ({
                   >
                     Filtrar por categoria
                   </h2>
-                  {activeCategory ? (
-                    <button
-                      type="button"
-                      onClick={() => setActiveCategory(null)}
-                      className="text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-                    >
-                      Limpar filtro
-                    </button>
-                  ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {serviceCategories.map((category) => {
@@ -1148,18 +1112,20 @@ export const DashboardLayout = ({
                   <SearchBar value={searchQuery} onSearch={setSearchQuery} />
                 </div>
 
-                <div className="fade-up-mount fade-up-mount-delay-4 mt-10 mb-5 mx-auto max-w-5/6">
-                  <h2
-                    className="text-2xl md:text-3xl font-serif font-semibold text-emerald-900 mb-2"
-                    id="categories-title"
-                  >
-                    Categorias
-                  </h2>
-                  <div className="w-full overflow-x-auto pb-2 pt-5 scrollbar-none">
-                    <div
-                      className="mx-auto flex w-max items-center justify-center gap-3 snap-x snap-mandatory scroll-px-4"
-                      id="services"
+                <div
+                  className="fade-up-mount fade-up-mount-delay-4 mx-auto mt-10 mb-5 max-w-5xl px-2"
+                  id="services"
+                >
+                  <div className="mb-4 flex items-center justify-center">
+                    <h2
+                      className="text-2xl font-serif font-semibold text-emerald-900 md:text-3xl"
+                      id="categories-title"
                     >
+                      Categorias
+                    </h2>
+                  </div>
+                  <div className="overflow-x-auto snap-x snap-mandatory scrollbar-none sm:overflow-visible">
+                    <div className="flex w-max min-w-full snap-x snap-mandatory gap-3 pb-2 sm:grid sm:w-full sm:grid-cols-3 sm:pb-0 lg:grid-cols-5">
                       {serviceCategories.map((category) => {
                         const isActive = activeCategory === category.name;
 
@@ -1167,28 +1133,32 @@ export const DashboardLayout = ({
                           <button
                             key={category.name}
                             type="button"
+                            aria-pressed={isActive}
                             onClick={() => toggleCategory(category.name)}
-                            className={`flex h-26 w-26 min-w-22 shrink-0 snap-start flex-col items-center justify-center rounded-2xl border p-2 text-center shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                            className={`group flex min-h-32 w-36 shrink-0 snap-start flex-col items-center justify-start gap-3 rounded-2xl border px-3 pt-5 pb-4 text-center shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 sm:w-auto sm:shrink ${
                               isActive
                                 ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
-                                : "cursor-pointer border-emerald-100 bg-white/90"
+                                : "border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
                             }`}
                           >
-                            <div
-                              className={`flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-br ${category.color} text-white shadow-sm`}
+                            <span
+                              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br ${category.color} text-white shadow-md transition-transform group-hover:scale-105`}
                             >
                               <category.icon
-                                className="h-4 w-4"
+                                className="h-5 w-5"
                                 strokeWidth={2}
+                                aria-hidden="true"
                               />
-                            </div>
-                            <p
-                              className={`mt-2 text-[11px] font-semibold leading-tight truncate ${
-                                isActive ? "text-emerald-800" : "text-slate-800"
+                            </span>
+                            <span
+                              className={`flex min-h-10 w-full items-center justify-center text-xs font-semibold leading-snug ${
+                                isActive
+                                  ? "text-emerald-900"
+                                  : "text-slate-700"
                               }`}
                             >
                               {category.name}
-                            </p>
+                            </span>
                           </button>
                         );
                       })}

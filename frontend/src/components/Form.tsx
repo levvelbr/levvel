@@ -23,6 +23,7 @@ import {
   getCurrentLocationLabel,
   getGeolocationErrorMessage,
 } from "../utils/geolocation";
+import { CATEGORY_OPTIONS } from "../utils/categoryIcons";
 
 type MultiValueField =
   | "servicos_oferecidos"
@@ -119,15 +120,6 @@ type WeeklySchedule = Record<WeekDayKey, DaySchedule>;
 
 type FormField = keyof FormValues | "horario_funcionamento";
 type FormErrors = Partial<Record<FormField, string>>;
-
-const categoryOptions = [
-  "Geral",
-  "Beleza",
-  "Bem-estar",
-  "Saúde",
-  "Spa",
-  "Estética",
-];
 
 const weekDays: Array<{ key: WeekDayKey; label: string; shortLabel: string }> =
   [
@@ -469,7 +461,7 @@ const initialFormValues: FormValues = {
   localizacao: "",
   cnpj: "",
   razao_social: "",
-  categoria: "Geral",
+  categoria: CATEGORY_OPTIONS[0],
   instagram: "",
   servicos_oferecidos: "",
   tecnicas_utilizadas: "",
@@ -2405,7 +2397,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 >
-                  {categoryOptions.map((category) => (
+                  {CATEGORY_OPTIONS.map((category) => (
                     <option key={category} value={category}>
                       {category}
                     </option>

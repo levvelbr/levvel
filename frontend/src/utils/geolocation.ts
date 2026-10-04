@@ -36,7 +36,7 @@ const reverseGeocode = async (coords: Coordinates): Promise<string> => {
     format: "jsonv2",
     lat: String(coords.latitude),
     lon: String(coords.longitude),
-    zoom: "14",
+    zoom: "18",
     addressdetails: "1",
   });
 
@@ -55,13 +55,15 @@ const reverseGeocode = async (coords: Coordinates): Promise<string> => {
   };
 
   const address = data.address;
+  const street =
+    address?.road ?? address?.pedestrian ?? address?.footway ?? address?.path;
   const neighborhood =
     address?.suburb ?? address?.neighbourhood ?? address?.quarter;
   const city =
     address?.city ?? address?.town ?? address?.village ?? address?.municipality;
   const state = address?.state;
 
-  const parts = [neighborhood, city, state].filter(Boolean);
+  const parts = [street, neighborhood, city, state].filter(Boolean);
 
   if (parts.length > 0) {
     return parts.join(", ");

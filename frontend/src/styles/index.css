@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  input[type="checkbox"],
+  input[type="file"]::file-selector-button,
+  select {
+    cursor: pointer;
+  }
+}
+
 html {
   scroll-behavior: smooth;
   overflow-x: clip;

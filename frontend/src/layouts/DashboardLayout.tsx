@@ -566,7 +566,7 @@ export const DashboardLayout = ({
   const renderProviderBookingCard = (booking: ProviderBooking) => (
     <div
       key={booking.id}
-      className={`relative flex h-28 shrink-0 flex-col justify-between rounded-2xl border p-3 max-md:h-32 ${getProviderBookingCardColors(booking.status)}`}
+      className={`relative flex min-h-28 shrink-0 flex-col justify-between gap-2 rounded-2xl border p-3 max-md:min-h-32 ${getProviderBookingCardColors(booking.status)}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 max-md:pr-24">
@@ -735,7 +735,7 @@ export const DashboardLayout = ({
       <main className="flex-1">
         {isProviderView ? (
           <section className="bg-linear-to-b from-blue-50 to-white px-4 py-10 sm:py-14">
-            <div className="mx-auto grid w-full max-w-5xl gap-6">
+            <div className="mx-auto grid w-full max-w-5xl grid-cols-[minmax(0,1fr)] gap-6">
               <div className="flex flex-wrap items-center gap-3">
                 <EstablishmentNavigation />
                 {providerTab === "agenda" && isGoogleCalendarConnected ? (
@@ -838,9 +838,9 @@ export const DashboardLayout = ({
                   </div>
 
                   <div className="fade-up-mount fade-up-mount-delay-2 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
                           <p className="text-lg font-semibold uppercase tracking-wide text-slate-900">
                             Agenda
                           </p>
@@ -857,7 +857,7 @@ export const DashboardLayout = ({
                       </div>
                       <Link
                         to="/?providerTab=agenda"
-                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        className="shrink-0 whitespace-nowrap rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                       >
                         Ver todos
                       </Link>
@@ -872,7 +872,7 @@ export const DashboardLayout = ({
                         Nenhum agendamento encontrado no momento.
                       </p>
                     ) : (
-                      <div className="grid gap-4 lg:grid-cols-2">
+                      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
                         <div className="space-y-4">
                           <section className="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-4">
                             <div className="flex items-center justify-between gap-2">

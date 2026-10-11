@@ -19,7 +19,7 @@ export const EstablishmentNavigation = () => {
   return (
     <nav
       aria-label="Navegação do estabelecimento"
-      className="flex w-fit flex-wrap items-center gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200"
+      className="flex w-fit max-w-full flex-wrap items-center gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200"
     >
       <Link
         to="/"

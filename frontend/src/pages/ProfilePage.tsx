@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowDownWideNarrow,
@@ -11,12 +12,30 @@ import {
   ArrowLeft,
   RotateCcw,
   X,
+  ZoomIn,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { AuthModal } from "../components/AuthModal";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
 import { EstablishmentNavigation } from "../components/EstablishmentNavigation";
+import Input from "../components/Input";
+import {
+  MultiValueInput,
+  btnOutline,
+  btnPrimary,
+  ScheduleEditor,
+} from "../components/ProviderProfileFields";
+import {
+  buildSchedulePayload,
+  parseSchedulePayload,
+  weekDays,
+  type WeeklySchedule,
+} from "../utils/schedule";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { useEscapeKey } from "../hooks/useEscapeKey";
+import { maskCnpj, maskCpf, maskPhone } from "../utils/documentMasks";
+import { getApiErrorMessage } from "../utils/apiErrors";
 import api from "../services/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -43,6 +62,8 @@ interface EstabelecimentoProfile {
   email: string;
   localizacao: string;
   foto_estabelecimento_url: string | null;
+  tipo_pessoa?: "juridica" | "autonomo" | null;
+  cpf?: string | null;
   cnpj: string | null;
   razao_social: string | null;
   categoria: string;
@@ -51,6 +72,7 @@ interface EstabelecimentoProfile {
   tecnicas_utilizadas: string[];
   produtos_aplicados: string[];
   profissionais_envolvidos: string[];
+  horario_funcionamento?: Record<string, unknown> | null;
   ativo: boolean;
   criado_em: string;
 }
@@ -203,6 +225,27 @@ export const ProfilePage = ({
     : "bg-emerald-700 hover:bg-emerald-800";
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<{
+    url: string;
+    alt: string;
+  } | null>(null);
+  const [isPhotoClosing, setIsPhotoClosing] = useState(false);
+  useBodyScrollLock(photoPreview !== null);
+
+  const closePhotoPreview = () => {
+    setIsPhotoClosing(true);
+    window.setTimeout(() => {
+      setPhotoPreview(null);
+      setIsPhotoClosing(false);
+    }, 220);
+  };
+
+  const openPhotoPreview = (url: string, alt: string) => {
+    setIsPhotoClosing(false);
+    setPhotoPreview({ url, alt });
+  };
+
+  useEscapeKey(photoPreview !== null && !isPhotoClosing, closePhotoPreview);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"profile" | "bookings">(
     () =>
@@ -233,6 +276,22 @@ export const ProfilePage = ({
   const [estabProfile, setEstabProfile] =
     useState<EstabelecimentoProfile | null>(null);
   const [estabLoading, setEstabLoading] = useState(false);
+  const [isEstabEditing, setIsEstabEditing] = useState(false);
+  const [estabSaving, setEstabSaving] = useState(false);
+  const [estabError, setEstabError] = useState<string | null>(null);
+  const [estabSuccess, setEstabSuccess] = useState(false);
+  const [estabForm, setEstabForm] = useState({
+    responsavel: "",
+    telefone: "",
+    instagram: "",
+    servicos_oferecidos: [] as string[],
+    tecnicas_utilizadas: [] as string[],
+    produtos_aplicados: [] as string[],
+    profissionais_envolvidos: [] as string[],
+  });
+  const [estabSchedule, setEstabSchedule] = useState<WeeklySchedule>(() =>
+    parseSchedulePayload(null),
+  );
 
   // ── Agendamentos state ───────────────────────────────────────────────────────
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
@@ -473,6 +532,75 @@ export const ProfilePage = ({
     }
   };
 
+  const startEstabEdit = () => {
+    if (!estabProfile) return;
+    setEstabForm({
+      responsavel: estabProfile.responsavel ?? "",
+      telefone: maskPhone(estabProfile.telefone ?? ""),
+      instagram: estabProfile.instagram ?? "",
+      servicos_oferecidos: [...(estabProfile.servicos_oferecidos ?? [])],
+      tecnicas_utilizadas: [...(estabProfile.tecnicas_utilizadas ?? [])],
+      produtos_aplicados: [...(estabProfile.produtos_aplicados ?? [])],
+      profissionais_envolvidos: [
+        ...(estabProfile.profissionais_envolvidos ?? []),
+      ],
+    });
+    setEstabSchedule(parseSchedulePayload(estabProfile.horario_funcionamento));
+    setEstabError(null);
+    setEstabSuccess(false);
+    setIsEstabEditing(true);
+  };
+
+  const handleEstabUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEstabError(null);
+    setEstabSuccess(false);
+
+    const responsavel = estabForm.responsavel.trim();
+    if (responsavel.length < 2) {
+      setEstabError("Informe o nome do responsável.");
+      return;
+    }
+    if (!estabForm.telefone.trim()) {
+      setEstabError("Telefone é obrigatório.");
+      return;
+    }
+    if (!estabForm.profissionais_envolvidos.length) {
+      setEstabError("Informe ao menos um profissional envolvido.");
+      return;
+    }
+    if (!weekDays.some((day) => estabSchedule[day.key].ativo)) {
+      setEstabError("Defina ao menos um dia de funcionamento.");
+      return;
+    }
+
+    setEstabSaving(true);
+    try {
+      const r = await api.patch("/v1/estabelecimentos/me/update", {
+        responsavel,
+        telefone: estabForm.telefone.trim(),
+        instagram: estabForm.instagram.trim() || null,
+        servicos_oferecidos: estabForm.servicos_oferecidos,
+        tecnicas_utilizadas: estabForm.tecnicas_utilizadas,
+        produtos_aplicados: estabForm.produtos_aplicados,
+        profissionais_envolvidos: estabForm.profissionais_envolvidos,
+        horario_funcionamento: buildSchedulePayload(estabSchedule),
+      });
+      setEstabProfile((prev) => ({
+        ...(prev as EstabelecimentoProfile),
+        ...(r.data as Partial<EstabelecimentoProfile>),
+      }));
+      setEstabSuccess(true);
+      setIsEstabEditing(false);
+    } catch (err: unknown) {
+      setEstabError(
+        getApiErrorMessage(err, "Não foi possível atualizar o perfil."),
+      );
+    } finally {
+      setEstabSaving(false);
+    }
+  };
+
   const handleStatusUpdate = async (
     id: string,
     status: Agendamento["status"],
@@ -597,6 +725,31 @@ export const ProfilePage = ({
 
   if (!session) return null;
 
+  const photoModal = photoPreview ? (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Foto de perfil ampliada"
+      onClick={closePhotoPreview}
+      className={`auth-modal-overlay fixed inset-0 z-100 flex items-center justify-center bg-slate-900/80 p-4 ${isPhotoClosing ? "auth-modal-overlay-exit" : "auth-modal-overlay-enter"}`}
+    >
+      <button
+        type="button"
+        onClick={closePhotoPreview}
+        aria-label="Fechar"
+        className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 hover:bg-white"
+      >
+        <X className="h-5 w-5" strokeWidth={2} />
+      </button>
+      <img
+        src={photoPreview.url}
+        alt={photoPreview.alt}
+        onClick={(event) => event.stopPropagation()}
+        className={`auth-modal-panel max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl ${isPhotoClosing ? "auth-modal-panel-exit" : "auth-modal-panel-enter"}`}
+      />
+    </div>
+  ) : null;
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -605,6 +758,7 @@ export const ProfilePage = ({
         embedded ? "bg-transparent" : "flex min-h-screen flex-col bg-slate-50"
       }
     >
+      {photoModal ? createPortal(photoModal, document.body) : null}
       {!embedded ? (
         <Header
           onOpenMenu={() => setIsSidebarOpen(true)}
@@ -692,11 +846,29 @@ export const ProfilePage = ({
                 <div className="mb-4 flex items-start justify-between">
                   <div className="flex items-start gap-4">
                     {clientProfile?.foto_perfil_url ? (
-                      <img
-                        src={clientProfile.foto_perfil_url}
-                        alt="Foto de perfil"
-                        className="h-16 w-16 rounded-2xl object-cover"
-                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openPhotoPreview(
+                            clientProfile.foto_perfil_url as string,
+                            "Foto de perfil",
+                          )
+                        }
+                        aria-label="Ampliar foto de perfil"
+                        className="group relative shrink-0 cursor-zoom-in overflow-hidden rounded-2xl"
+                      >
+                        <img
+                          src={clientProfile.foto_perfil_url}
+                          alt="Foto de perfil"
+                          className="h-16 w-16 rounded-2xl object-cover"
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-900/50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+                          <ZoomIn
+                            className="h-6 w-6 text-white"
+                            strokeWidth={2}
+                          />
+                        </span>
+                      </button>
                     ) : (
                       <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-lg font-semibold text-slate-500">
                         {session.nome.charAt(0).toUpperCase()}
@@ -958,11 +1130,29 @@ export const ProfilePage = ({
                 <div className="space-y-4">
                   <div className="flex items-start gap-4">
                     {estabProfile.foto_estabelecimento_url ? (
-                      <img
-                        src={estabProfile.foto_estabelecimento_url}
-                        alt={estabProfile.nome_estabelecimento}
-                        className="h-16 w-16 rounded-2xl object-cover"
-                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openPhotoPreview(
+                            estabProfile.foto_estabelecimento_url as string,
+                            estabProfile.nome_estabelecimento,
+                          )
+                        }
+                        aria-label="Ampliar foto de perfil"
+                        className="group relative shrink-0 cursor-zoom-in overflow-hidden rounded-2xl"
+                      >
+                        <img
+                          src={estabProfile.foto_estabelecimento_url}
+                          alt={estabProfile.nome_estabelecimento}
+                          className="h-16 w-16 rounded-2xl object-cover"
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-900/50 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100">
+                          <ZoomIn
+                            className="h-6 w-6 text-white"
+                            strokeWidth={2}
+                          />
+                        </span>
+                      </button>
                     ) : (
                       <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-400">
                         Sem foto
@@ -1012,60 +1202,331 @@ export const ProfilePage = ({
                     ) : null}
                   </div>
 
-                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt className="font-semibold text-slate-900">
-                        Responsável
-                      </dt>
-                      <dd className="text-slate-600">
-                        {estabProfile.responsavel}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-slate-900">Telefone</dt>
-                      <dd className="text-slate-600">
-                        {estabProfile.telefone}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-slate-900">E-mail</dt>
-                      <dd className="text-slate-600">{estabProfile.email}</dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-slate-900">
-                        Localização
-                      </dt>
-                      <dd className="text-slate-600">
-                        {estabProfile.localizacao}
-                      </dd>
-                    </div>
-                    {estabProfile.cnpj && (
-                      <div>
-                        <dt className="font-semibold text-slate-900">CNPJ</dt>
-                        <dd className="text-slate-600">{estabProfile.cnpj}</dd>
-                      </div>
-                    )}
-                    {estabProfile.instagram && (
-                      <div>
-                        <dt className="font-semibold text-slate-900">
-                          Instagram
-                        </dt>
-                        <dd className="text-slate-600">
-                          {estabProfile.instagram}
-                        </dd>
-                      </div>
-                    )}
-                  </dl>
+                  {estabSuccess && !isEstabEditing && (
+                    <p className="rounded-xl bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">
+                      Perfil atualizado com sucesso.
+                    </p>
+                  )}
 
-                  {estabProfile.servicos_oferecidos.length > 0 && (
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        Serviços
-                      </p>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {estabProfile.servicos_oferecidos.join(", ")}
-                      </p>
-                    </div>
+                  {isEstabEditing ? (
+                    <form
+                      onSubmit={handleEstabUpdate}
+                      className="grid gap-4 md:grid-cols-2"
+                    >
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-slate-700">
+                          Responsável *
+                        </span>
+                        <Input
+                          className="focus:ring-blue-300!"
+                          value={estabForm.responsavel}
+                          onChange={(e) =>
+                            setEstabForm((prev) => ({
+                              ...prev,
+                              responsavel: e.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-slate-700">
+                          Telefone *
+                        </span>
+                        <Input
+                          className="focus:ring-blue-300!"
+                          inputMode="tel"
+                          value={estabForm.telefone}
+                          onChange={(e) =>
+                            setEstabForm((prev) => ({
+                              ...prev,
+                              telefone: maskPhone(e.target.value),
+                            }))
+                          }
+                        />
+                      </label>
+                      <label className="space-y-2 md:col-span-2">
+                        <span className="text-sm font-medium text-slate-700">
+                          Instagram
+                        </span>
+                        <Input
+                          className="focus:ring-blue-300!"
+                          value={estabForm.instagram}
+                          placeholder="@seu_instagram"
+                          onChange={(e) =>
+                            setEstabForm((prev) => ({
+                              ...prev,
+                              instagram: e.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <MultiValueInput
+                        id="perfil-servicos"
+                        label="Serviços oferecidos"
+                        placeholder="Digite um serviço e adicione"
+                        values={estabForm.servicos_oferecidos}
+                        onChange={(values) =>
+                          setEstabForm((prev) => ({
+                            ...prev,
+                            servicos_oferecidos: values,
+                          }))
+                        }
+                      />
+                      <MultiValueInput
+                        id="perfil-tecnicas"
+                        label="Técnicas utilizadas"
+                        placeholder="Digite uma técnica e adicione"
+                        values={estabForm.tecnicas_utilizadas}
+                        onChange={(values) =>
+                          setEstabForm((prev) => ({
+                            ...prev,
+                            tecnicas_utilizadas: values,
+                          }))
+                        }
+                      />
+                      <MultiValueInput
+                        id="perfil-produtos"
+                        label="Produtos aplicados"
+                        placeholder="Digite um produto e adicione"
+                        values={estabForm.produtos_aplicados}
+                        onChange={(values) =>
+                          setEstabForm((prev) => ({
+                            ...prev,
+                            produtos_aplicados: values,
+                          }))
+                        }
+                      />
+                      <MultiValueInput
+                        id="perfil-profissionais"
+                        label="Profissionais envolvidos"
+                        placeholder="Digite um profissional e adicione"
+                        values={estabForm.profissionais_envolvidos}
+                        onChange={(values) =>
+                          setEstabForm((prev) => ({
+                            ...prev,
+                            profissionais_envolvidos: values,
+                          }))
+                        }
+                      />
+                      <ScheduleEditor
+                        schedule={estabSchedule}
+                        onChange={setEstabSchedule}
+                      />
+
+                      {estabError && (
+                        <p className="rounded-xl bg-rose-50 px-4 py-2 text-sm text-rose-700 md:col-span-2">
+                          {estabError}
+                        </p>
+                      )}
+
+                      <div className="flex gap-3 md:col-span-2">
+                        <button
+                          type="submit"
+                          disabled={estabSaving}
+                          className={btnPrimary}
+                        >
+                          {estabSaving ? "Salvando..." : "Salvar alterações"}
+                        </button>
+                        <button
+                          type="button"
+                          className={`${btnOutline} !px-4 !py-2 !text-sm`}
+                          disabled={estabSaving}
+                          onClick={() => {
+                            setIsEstabEditing(false);
+                            setEstabError(null);
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                        {(
+                          [
+                            ["Responsável", estabProfile.responsavel],
+                            [
+                              "Telefone",
+                              maskPhone(estabProfile.telefone ?? ""),
+                            ],
+                            ["E-mail", estabProfile.email],
+                            ["Localização", estabProfile.localizacao],
+                            [
+                              "Tipo de pessoa",
+                              estabProfile.tipo_pessoa === "juridica"
+                                ? "Pessoa jurídica"
+                                : estabProfile.tipo_pessoa === "autonomo"
+                                  ? "Autônomo"
+                                  : null,
+                            ],
+                            [
+                              "CPF",
+                              estabProfile.cpf
+                                ? maskCpf(estabProfile.cpf)
+                                : null,
+                            ],
+                            [
+                              "CNPJ",
+                              estabProfile.cnpj
+                                ? maskCnpj(estabProfile.cnpj)
+                                : null,
+                            ],
+                            ["Razão social", estabProfile.razao_social],
+                            ["Categoria", estabProfile.categoria],
+                          ] as Array<[string, string | null | undefined]>
+                        )
+                          .filter(
+                            ([label, value]) =>
+                              value ||
+                              !["CPF", "CNPJ", "Razão social"].includes(label),
+                          )
+                          .map(([label, value]) => (
+                            <div key={label}>
+                              <dt className="font-semibold text-slate-900">
+                                {label}
+                              </dt>
+                              <dd className="text-slate-600">
+                                {value || "Não informado"}
+                              </dd>
+                            </div>
+                          ))}
+                        <div>
+                          <dt className="font-semibold text-slate-900">
+                            Instagram
+                          </dt>
+                          <dd className="text-slate-600">
+                            {estabProfile.instagram ? (
+                              <a
+                                href={`https://instagram.com/${estabProfile.instagram.replace(/^@/, "")}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-700 hover:underline"
+                              >
+                                {estabProfile.instagram.startsWith("@")
+                                  ? estabProfile.instagram
+                                  : `@${estabProfile.instagram}`}
+                              </a>
+                            ) : (
+                              "Não informado"
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
+
+                      {(
+                        [
+                          [
+                            "Serviços oferecidos",
+                            estabProfile.servicos_oferecidos,
+                          ],
+                          [
+                            "Técnicas utilizadas",
+                            estabProfile.tecnicas_utilizadas,
+                          ],
+                          [
+                            "Produtos aplicados",
+                            estabProfile.produtos_aplicados,
+                          ],
+                          [
+                            "Profissionais envolvidos",
+                            estabProfile.profissionais_envolvidos,
+                          ],
+                        ] as Array<[string, string[] | undefined]>
+                      ).map(([label, items]) => (
+                        <div key={label}>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {label}
+                          </p>
+                          {items?.length ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {items.map((item) => (
+                                <span
+                                  key={item}
+                                  className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800"
+                                >
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-1 text-sm text-slate-500">
+                              Não informado
+                            </p>
+                          )}
+                        </div>
+                      ))}
+
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          Horário de funcionamento
+                        </p>
+                        {(() => {
+                          const parsed = parseSchedulePayload(
+                            estabProfile.horario_funcionamento,
+                          );
+                          const todayKey =
+                            weekDays[(new Date().getDay() + 6) % 7].key;
+                          if (!weekDays.some((day) => parsed[day.key].ativo)) {
+                            return (
+                              <p className="mt-1 text-sm text-slate-500">
+                                Não informado
+                              </p>
+                            );
+                          }
+                          return (
+                            <ul className="mt-2 space-y-2">
+                              {weekDays.map((day) => {
+                                const { ativo, faixas } = parsed[day.key];
+                                return (
+                                  <li
+                                    key={day.key}
+                                    className={`flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
+                                      ativo
+                                        ? "border-blue-100 bg-blue-50/60"
+                                        : "border-slate-200 bg-slate-50"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`w-32 text-sm font-semibold ${ativo ? "text-blue-900" : "text-slate-400"}`}
+                                    >
+                                      {day.label}
+                                      {day.key === todayKey ? (
+                                        <span className="ml-2 rounded-full bg-blue-700 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">
+                                          Hoje
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                    {ativo ? (
+                                      faixas.map((r) => (
+                                        <span
+                                          key={`${r.inicio}-${r.fim}`}
+                                          className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-900"
+                                        >
+                                          {r.inicio} às {r.fim}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-500">
+                                        Fechado
+                                      </span>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          );
+                        })()}
+                      </div>
+
+                      <button
+                        type="button"
+                        className={`${btnOutline} !px-4 !py-2 !text-sm`}
+                        onClick={startEstabEdit}
+                      >
+                        Editar perfil
+                      </button>
+                    </>
                   )}
                 </div>
               ) : (
@@ -1262,7 +1723,7 @@ export const ProfilePage = ({
                   filteredAgendamentos.map((ag) => (
                     <div
                       key={ag.id}
-                      className={`${isEstablishment ? "flex min-h-44 flex-col justify-between rounded-2xl border p-4 max-md:min-h-48" : "rounded-3xl border p-5"} shadow-sm ${isEstablishment ? getProviderBookingCardColors(ag.status) : "border-slate-200 bg-white"}`}
+                      className={`${isEstablishment ? "flex min-h-44 flex-col justify-between gap-2 rounded-2xl border p-4 max-md:min-h-48" : "rounded-3xl border p-5"} shadow-sm ${isEstablishment ? getProviderBookingCardColors(ag.status) : "border-slate-200 bg-white"}`}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0 space-y-2">

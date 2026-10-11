@@ -583,6 +583,11 @@ export const ProfilePage = ({
     setIsEstabEditing(true);
   };
 
+  const cancelEstabEdit = () => {
+    setIsEstabEditing(false);
+    setEstabError(null);
+  };
+
   const handleEstabUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setEstabError(null);
@@ -996,7 +1001,7 @@ export const ProfilePage = ({
 
           {/* ── Profile tab ── */}
           {activeTab === "profile" && session.role === "cliente" && (
-            <div className="space-y-6">
+            <div className="fade-up-mount space-y-6">
               {/* Profile info */}
               <div className={sectionClass}>
                 <div className="mb-4 flex items-start justify-between">
@@ -1030,7 +1035,10 @@ export const ProfilePage = ({
                         {session.nome.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <div>
+                    <div
+                      key={clientLoading ? "loading" : "loaded"}
+                      className="data-fade-in"
+                    >
                       <h1 className="text-xl font-semibold text-slate-900">
                         {clientLoading
                           ? "Carregando..."
@@ -1091,7 +1099,7 @@ export const ProfilePage = ({
                 </div>
 
                 {clientProfile && !isEditing && (
-                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                  <dl className="data-fade-in grid gap-3 text-sm sm:grid-cols-2">
                     <div>
                       <dt className="font-semibold text-slate-900">
                         Como prefere ser chamado
@@ -1271,19 +1279,30 @@ export const ProfilePage = ({
               )}
 
               {editSuccess && !isEditing && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-                  Perfil atualizado com sucesso.
+                <div
+                  role="status"
+                  className="flex items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+                >
+                  <p>Perfil atualizado com sucesso.</p>
+                  <button
+                    type="button"
+                    aria-label="Fechar alerta"
+                    onClick={() => setEditSuccess(false)}
+                    className="shrink-0 rounded-md p-0.5 transition-colors hover:bg-emerald-100"
+                  >
+                    <X className="h-4 w-4" strokeWidth={2} />
+                  </button>
                 </div>
               )}
             </div>
           )}
 
           {activeTab === "profile" && session.role === "estabelecimento" && (
-            <div className={sectionClass}>
+            <div className={`fade-up-mount ${sectionClass}`}>
               {estabLoading ? (
                 <p className="text-sm text-slate-500">Carregando perfil...</p>
               ) : estabProfile ? (
-                <div className="space-y-4">
+                <div className="data-fade-in space-y-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-4">
                       {estabProfile.foto_estabelecimento_url ? (
@@ -1324,7 +1343,7 @@ export const ProfilePage = ({
                         </p>
                       </div>
                     </div>
-                    {!isEstabEditing && (
+                    {!isEstabEditing ? (
                       <button
                         type="button"
                         className={`${btnOutline} !px-4 !py-2 !text-sm shrink-0`}
@@ -1332,11 +1351,30 @@ export const ProfilePage = ({
                       >
                         Editar perfil
                       </button>
+                    ) : (
+                      <div className="data-fade-in flex shrink-0 gap-2">
+                        <button
+                          type="submit"
+                          form="estab-edit-form"
+                          disabled={estabSaving}
+                          className={`${btnPrimary} !px-4 !py-2 !text-sm`}
+                        >
+                          {estabSaving ? "Salvando..." : "Salvar Alterações"}
+                        </button>
+                        <button
+                          type="button"
+                          className={`${btnOutline} !px-4 !py-2 !text-sm`}
+                          disabled={estabSaving}
+                          onClick={cancelEstabEdit}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     )}
                   </div>
 
                   {isEstabEditing && (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="data-fade-in rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <p className="text-sm font-semibold text-slate-900">
                         Foto de perfil
                       </p>
@@ -1373,15 +1411,27 @@ export const ProfilePage = ({
                   )}
 
                   {estabSuccess && !isEstabEditing && (
-                    <p className="rounded-xl bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">
-                      Perfil atualizado com sucesso.
-                    </p>
+                    <div
+                      role="status"
+                      className="flex items-start justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700"
+                    >
+                      <p>Perfil atualizado com sucesso.</p>
+                      <button
+                        type="button"
+                        aria-label="Fechar alerta"
+                        onClick={() => setEstabSuccess(false)}
+                        className="shrink-0 rounded-md p-0.5 transition-colors hover:bg-emerald-100"
+                      >
+                        <X className="h-4 w-4" strokeWidth={2} />
+                      </button>
+                    </div>
                   )}
 
                   {isEstabEditing ? (
                     <form
+                      id="estab-edit-form"
                       onSubmit={handleEstabUpdate}
-                      className="grid gap-4 md:grid-cols-2"
+                      className="data-fade-in grid gap-4 md:grid-cols-2"
                     >
                       <label className="space-y-2">
                         <span className="text-sm font-medium text-slate-700">
@@ -1513,17 +1563,14 @@ export const ProfilePage = ({
                           type="button"
                           className={`${btnOutline} !px-4 !py-2 !text-sm`}
                           disabled={estabSaving}
-                          onClick={() => {
-                            setIsEstabEditing(false);
-                            setEstabError(null);
-                          }}
+                          onClick={cancelEstabEdit}
                         >
                           Cancelar
                         </button>
                       </div>
                     </form>
                   ) : (
-                    <>
+                    <div className="data-fade-in space-y-4">
                       <dl className="grid gap-3 text-sm sm:grid-cols-2">
                         {(
                           [
@@ -1700,7 +1747,15 @@ export const ProfilePage = ({
                           );
                         })()}
                       </div>
-                    </>
+
+                      <button
+                        type="button"
+                        className={`${btnOutline} !px-4 !py-2 !text-sm`}
+                        onClick={startEstabEdit}
+                      >
+                        Editar perfil
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : (
@@ -1715,7 +1770,7 @@ export const ProfilePage = ({
           {activeTab === "bookings" && (
             <div className="space-y-4">
               {isEstablishment && (
-                <div className="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+                <div className="fade-up-mount rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Filter
@@ -1880,7 +1935,7 @@ export const ProfilePage = ({
                   </div>
                 </div>
               )}
-              <div className="mx-auto w-full max-w-3xl space-y-4">
+              <div className="fade-up-mount fade-up-mount-delay-1 mx-auto w-full max-w-3xl space-y-4">
                 {agendamentosLoading ? (
                   <div className={sectionClass}>
                     <p className="text-sm text-slate-500">
@@ -1910,7 +1965,7 @@ export const ProfilePage = ({
                                 })
                             : undefined
                         }
-                        className={`${isEstablishment ? `flex cursor-pointer flex-col rounded-2xl border p-4 transition-shadow hover:shadow-sm` : "rounded-3xl border p-5"} shadow-xs ${isEstablishment ? getProviderBookingCardColors(ag.status) : "border-slate-200 bg-white"}`}
+                        className={`data-fade-in ${isEstablishment ? `flex cursor-pointer flex-col rounded-2xl border p-4 transition-shadow hover:shadow-sm` : "rounded-3xl border p-5"} shadow-xs ${isEstablishment ? getProviderBookingCardColors(ag.status) : "border-slate-200 bg-white"}`}
                       >
                         <div
                           className="flex flex-wrap items-start justify-between gap-2"

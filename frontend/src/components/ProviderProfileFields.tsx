@@ -107,10 +107,19 @@ export const MultiValueInput = ({
 interface ScheduleEditorProps {
   schedule: WeeklySchedule;
   onChange: (schedule: WeeklySchedule) => void;
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
-export const ScheduleEditor = ({ schedule, onChange }: ScheduleEditorProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const ScheduleEditor = ({
+  schedule,
+  onChange,
+  onOpenChange,
+}: ScheduleEditorProps) => {
+  const [isOpen, setIsOpenState] = useState(false);
+  const setIsOpen = (value: boolean) => {
+    setIsOpenState(value);
+    onOpenChange?.(value);
+  };
   const [draft, setDraft] = useState<WeeklySchedule>(schedule);
   const [fieldErrors, setFieldErrors] = useState<
     Record<string, RangeFieldError>

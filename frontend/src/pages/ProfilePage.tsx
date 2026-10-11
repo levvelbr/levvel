@@ -277,6 +277,7 @@ export const ProfilePage = ({
     useState<EstabelecimentoProfile | null>(null);
   const [estabLoading, setEstabLoading] = useState(false);
   const [isEstabEditing, setIsEstabEditing] = useState(false);
+  const [isScheduleEditorOpen, setIsScheduleEditorOpen] = useState(false);
   const [estabSaving, setEstabSaving] = useState(false);
   const [estabError, setEstabError] = useState<string | null>(null);
   const [estabSuccess, setEstabSuccess] = useState(false);
@@ -548,6 +549,7 @@ export const ProfilePage = ({
     setEstabSchedule(parseSchedulePayload(estabProfile.horario_funcionamento));
     setEstabError(null);
     setEstabSuccess(false);
+    setIsScheduleEditorOpen(false);
     setIsEstabEditing(true);
   };
 
@@ -555,6 +557,13 @@ export const ProfilePage = ({
     e.preventDefault();
     setEstabError(null);
     setEstabSuccess(false);
+
+    if (isScheduleEditorOpen) {
+      setEstabError(
+        "Salve a edição dos horários de funcionamento antes de salvar o perfil.",
+      );
+      return;
+    }
 
     const responsavel = estabForm.responsavel.trim();
     if (responsavel.length < 2) {
@@ -574,18 +583,39 @@ export const ProfilePage = ({
       return;
     }
 
+    const payload = {
+      responsavel,
+      telefone: estabForm.telefone.trim(),
+      instagram: estabForm.instagram.trim() || null,
+      servicos_oferecidos: estabForm.servicos_oferecidos,
+      tecnicas_utilizadas: estabForm.tecnicas_utilizadas,
+      produtos_aplicados: estabForm.produtos_aplicados,
+      profissionais_envolvidos: estabForm.profissionais_envolvidos,
+      horario_funcionamento: buildSchedulePayload(estabSchedule),
+    };
+
+    if (estabProfile) {
+      const original = {
+        responsavel: (estabProfile.responsavel ?? "").trim(),
+        telefone: maskPhone(estabProfile.telefone ?? "").trim(),
+        instagram: (estabProfile.instagram ?? "").trim() || null,
+        servicos_oferecidos: estabProfile.servicos_oferecidos ?? [],
+        tecnicas_utilizadas: estabProfile.tecnicas_utilizadas ?? [],
+        produtos_aplicados: estabProfile.produtos_aplicados ?? [],
+        profissionais_envolvidos: estabProfile.profissionais_envolvidos ?? [],
+        horario_funcionamento: buildSchedulePayload(
+          parseSchedulePayload(estabProfile.horario_funcionamento),
+        ),
+      };
+      if (JSON.stringify(original) === JSON.stringify(payload)) {
+        setIsEstabEditing(false);
+        return;
+      }
+    }
+
     setEstabSaving(true);
     try {
-      const r = await api.patch("/v1/estabelecimentos/me/update", {
-        responsavel,
-        telefone: estabForm.telefone.trim(),
-        instagram: estabForm.instagram.trim() || null,
-        servicos_oferecidos: estabForm.servicos_oferecidos,
-        tecnicas_utilizadas: estabForm.tecnicas_utilizadas,
-        produtos_aplicados: estabForm.produtos_aplicados,
-        profissionais_envolvidos: estabForm.profissionais_envolvidos,
-        horario_funcionamento: buildSchedulePayload(estabSchedule),
-      });
+      const r = await api.patch("/v1/estabelecimentos/me/update", payload);
       setEstabProfile((prev) => ({
         ...(prev as EstabelecimentoProfile),
         ...(r.data as Partial<EstabelecimentoProfile>),
@@ -1128,79 +1158,93 @@ export const ProfilePage = ({
                 <p className="text-sm text-slate-500">Carregando perfil...</p>
               ) : estabProfile ? (
                 <div className="space-y-4">
-                  <div className="flex items-start gap-4">
-                    {estabProfile.foto_estabelecimento_url ? (
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      {estabProfile.foto_estabelecimento_url ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openPhotoPreview(
+                              estabProfile.foto_estabelecimento_url as string,
+                              estabProfile.nome_estabelecimento,
+                            )
+                          }
+                          aria-label="Ampliar foto de perfil"
+                          className="group relative shrink-0 cursor-zoom-in overflow-hidden rounded-2xl"
+                        >
+                          <img
+                            src={estabProfile.foto_estabelecimento_url}
+                            alt={estabProfile.nome_estabelecimento}
+                            className="h-16 w-16 rounded-2xl object-cover"
+                          />
+                          <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-900/50 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100">
+                            <ZoomIn
+                              className="h-6 w-6 text-white"
+                              strokeWidth={2}
+                            />
+                          </span>
+                        </button>
+                      ) : (
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-400">
+                          Sem foto
+                        </div>
+                      )}
+                      <div>
+                        <h1 className="text-xl font-semibold text-slate-900">
+                          {estabProfile.nome_estabelecimento}
+                        </h1>
+                        <p className="text-sm text-slate-500">
+                          {estabProfile.categoria}
+                        </p>
+                      </div>
+                    </div>
+                    {!isEstabEditing && (
                       <button
                         type="button"
-                        onClick={() =>
-                          openPhotoPreview(
-                            estabProfile.foto_estabelecimento_url as string,
-                            estabProfile.nome_estabelecimento,
-                          )
-                        }
-                        aria-label="Ampliar foto de perfil"
-                        className="group relative shrink-0 cursor-zoom-in overflow-hidden rounded-2xl"
+                        className={`${btnOutline} !px-4 !py-2 !text-sm shrink-0`}
+                        onClick={startEstabEdit}
                       >
-                        <img
-                          src={estabProfile.foto_estabelecimento_url}
-                          alt={estabProfile.nome_estabelecimento}
-                          className="h-16 w-16 rounded-2xl object-cover"
-                        />
-                        <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-900/50 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100">
-                          <ZoomIn
-                            className="h-6 w-6 text-white"
-                            strokeWidth={2}
-                          />
-                        </span>
+                        Editar perfil
                       </button>
-                    ) : (
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xs font-semibold text-slate-400">
-                        Sem foto
-                      </div>
                     )}
-                    <div>
-                      <h1 className="text-xl font-semibold text-slate-900">
-                        {estabProfile.nome_estabelecimento}
-                      </h1>
-                      <p className="text-sm text-slate-500">
-                        {estabProfile.categoria}
-                      </p>
-                    </div>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Foto de perfil
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Envie uma imagem para representar seu perfil de prestador.
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-3">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0] ?? null;
-                          setSelectedPhotoFile(file);
-                          setPhotoUploadError(null);
-                        }}
-                        className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-800"
-                      />
-                      <button
-                        type="button"
-                        disabled={!selectedPhotoFile || photoUploadLoading}
-                        onClick={handlePhotoUpload}
-                        className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${accentButton} disabled:opacity-60`}
-                      >
-                        {photoUploadLoading ? "Enviando..." : "Salvar foto"}
-                      </button>
-                    </div>
-                    {photoUploadError ? (
-                      <p className="mt-2 text-sm text-rose-700">
-                        {photoUploadError}
+                  {isEstabEditing && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-900">
+                        Foto de perfil
                       </p>
-                    ) : null}
-                  </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Envie uma imagem para representar seu perfil de
+                        prestador.
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            setSelectedPhotoFile(file);
+                            setPhotoUploadError(null);
+                          }}
+                          className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-blue-800"
+                        />
+                        <button
+                          type="button"
+                          disabled={!selectedPhotoFile || photoUploadLoading}
+                          onClick={handlePhotoUpload}
+                          className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${accentButton} disabled:opacity-60`}
+                        >
+                          {photoUploadLoading ? "Enviando..." : "Salvar foto"}
+                        </button>
+                      </div>
+                      {photoUploadError ? (
+                        <p className="mt-2 text-sm text-rose-700">
+                          {photoUploadError}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
 
                   {estabSuccess && !isEstabEditing && (
                     <p className="rounded-xl bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">
@@ -1311,15 +1355,27 @@ export const ProfilePage = ({
                       <ScheduleEditor
                         schedule={estabSchedule}
                         onChange={setEstabSchedule}
+                        onOpenChange={setIsScheduleEditorOpen}
                       />
 
                       {estabError && (
-                        <p className="rounded-xl bg-rose-50 px-4 py-2 text-sm text-rose-700 md:col-span-2">
-                          {estabError}
-                        </p>
+                        <div
+                          role="alert"
+                          className="flex items-start justify-between gap-3 rounded-xl bg-rose-50 px-4 py-2 text-sm text-rose-700 md:col-span-2"
+                        >
+                          <p>{estabError}</p>
+                          <button
+                            type="button"
+                            aria-label="Fechar alerta"
+                            onClick={() => setEstabError(null)}
+                            className="shrink-0 rounded-md p-0.5 text-rose-700 transition-colors hover:bg-rose-100"
+                          >
+                            <X className="h-4 w-4" strokeWidth={2} />
+                          </button>
+                        </div>
                       )}
 
-                      <div className="flex gap-3 md:col-span-2">
+                      <div className="sticky bottom-0 z-30 -mx-6 -mb-6 flex gap-3 rounded-b-3xl border-t border-slate-200 bg-white/95 px-6 py-4 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur-sm md:col-span-2">
                         <button
                           type="submit"
                           disabled={estabSaving}
@@ -1518,14 +1574,6 @@ export const ProfilePage = ({
                           );
                         })()}
                       </div>
-
-                      <button
-                        type="button"
-                        className={`${btnOutline} !px-4 !py-2 !text-sm`}
-                        onClick={startEstabEdit}
-                      >
-                        Editar perfil
-                      </button>
                     </>
                   )}
                 </div>

@@ -1,4 +1,5 @@
 import {
+  useId,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -6,6 +7,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeft, ChevronDown, LocateFixed, X } from "lucide-react";
 import Input from "./Input";
 import Button from "./Button";
@@ -23,6 +25,24 @@ import {
   getCurrentLocationLabel,
   getGeolocationErrorMessage,
 } from "../utils/geolocation";
+import { CATEGORY_OPTIONS } from "../utils/categoryIcons";
+import {
+  weekDays,
+  createEmptyRange,
+  createInitialSchedule,
+  cloneSchedule,
+  getRangeErrorKey,
+  getRangeInputRefKey,
+  getDayErrorBadge,
+  formatTimeInput,
+  normalizeTimeOnBlur,
+  validateSchedule,
+  buildSchedulePayload,
+  type WeekDayKey,
+  type TimeRange,
+  type WeeklySchedule,
+  type RangeFieldError,
+} from "../utils/schedule";
 
 type MultiValueField =
   | "servicos_oferecidos"
@@ -65,7 +85,57 @@ interface ServiceCity {
   city: string;
 }
 
-type LocationInputMode = "cep" | "manual";
+type LocationInputMode = "cep" | "manual" | "geo";
+
+const SEM_NUMERO = "S/N";
+
+interface ManualAddress {
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  uf: string;
+  cidade: string;
+}
+
+const initialManualAddress = (): ManualAddress => ({
+  logradouro: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
+  uf: "",
+  cidade: "",
+});
+
+const isManualAddressComplete = (address: ManualAddress) =>
+  Boolean(
+    address.logradouro.trim() &&
+    address.bairro.trim() &&
+    address.uf &&
+    address.cidade,
+  );
+
+const isManualAddressEmpty = (address: ManualAddress) =>
+  Object.values(address).every((value) => !value.trim());
+
+const composeManualLocation = (address: ManualAddress) => {
+  if (!isManualAddressComplete(address)) {
+    return "";
+  }
+
+  const enderecoLinha = [address.logradouro.trim(), address.numero.trim()]
+    .filter(Boolean)
+    .join(", ");
+
+  return [
+    enderecoLinha,
+    address.complemento.trim(),
+    address.bairro.trim(),
+    `${address.cidade} - ${address.uf}`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+};
 
 interface ViaCepAddress {
   logradouro: string;
@@ -82,353 +152,12 @@ interface ViaCepResponse {
   uf?: string;
 }
 
-type WeekDayKey =
-  "segunda" | "terca" | "quarta" | "quinta" | "sexta" | "sabado" | "domingo";
-
-interface TimeRange {
-  inicio: string;
-  fim: string;
-}
-
-interface DaySchedule {
-  ativo: boolean;
-  faixas: TimeRange[];
-}
-
-interface RangeFieldError {
-  inicio?: string;
-  fim?: string;
-  row?: string;
-}
-
-interface ScheduleValidationResult {
-  message: string | null;
-  fieldErrors: Record<string, RangeFieldError>;
-}
-
-interface DayErrorBadge {
-  hasError: boolean;
-  message: string | null;
-}
-
 interface FormProps {
   onLoginSuccess: (session: UserSession) => void;
 }
 
-type WeeklySchedule = Record<WeekDayKey, DaySchedule>;
-
 type FormField = keyof FormValues | "horario_funcionamento";
 type FormErrors = Partial<Record<FormField, string>>;
-
-const categoryOptions = [
-  "Geral",
-  "Beleza",
-  "Bem-estar",
-  "Saúde",
-  "Spa",
-  "Estética",
-];
-
-const weekDays: Array<{ key: WeekDayKey; label: string; shortLabel: string }> =
-  [
-    { key: "segunda", label: "Segunda-feira", shortLabel: "Seg" },
-    { key: "terca", label: "Terça-feira", shortLabel: "Ter" },
-    { key: "quarta", label: "Quarta-feira", shortLabel: "Qua" },
-    { key: "quinta", label: "Quinta-feira", shortLabel: "Qui" },
-    { key: "sexta", label: "Sexta-feira", shortLabel: "Sex" },
-    { key: "sabado", label: "Sábado", shortLabel: "Sáb" },
-    { key: "domingo", label: "Domingo", shortLabel: "Dom" },
-  ];
-
-const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
-const createEmptyRange = (): TimeRange => ({ inicio: "", fim: "" });
-
-const createInitialSchedule = (): WeeklySchedule =>
-  weekDays.reduce((acc, day) => {
-    acc[day.key] = {
-      ativo: false,
-      faixas: [createEmptyRange()],
-    };
-
-    return acc;
-  }, {} as WeeklySchedule);
-
-const cloneSchedule = (schedule: WeeklySchedule): WeeklySchedule =>
-  weekDays.reduce((acc, day) => {
-    const daySchedule = schedule[day.key];
-
-    acc[day.key] = {
-      ativo: daySchedule.ativo,
-      faixas: daySchedule.faixas.map((range) => ({ ...range })),
-    };
-
-    return acc;
-  }, {} as WeeklySchedule);
-
-const toMinutes = (value: string) => {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
-};
-
-const getRangeErrorKey = (dayKey: WeekDayKey, index: number) =>
-  `${dayKey}-${index}`;
-
-const getRangeInputRefKey = (
-  dayKey: WeekDayKey,
-  index: number,
-  field: keyof TimeRange,
-) => `${dayKey}-${index}-${field}`;
-
-const setFieldError = (
-  errors: Record<string, RangeFieldError>,
-  key: string,
-  nextError: RangeFieldError,
-) => {
-  errors[key] = {
-    ...errors[key],
-    ...nextError,
-  };
-};
-
-const getDayErrorBadge = (
-  dayKey: WeekDayKey,
-  fieldErrors: Record<string, RangeFieldError>,
-): DayErrorBadge => {
-  for (const [key, value] of Object.entries(fieldErrors)) {
-    if (!key.startsWith(`${dayKey}-`)) {
-      continue;
-    }
-
-    return {
-      hasError: true,
-      message: value.row ?? value.inicio ?? value.fim ?? "Ajuste as faixas",
-    };
-  }
-
-  return {
-    hasError: false,
-    message: null,
-  };
-};
-
-const formatTimeInput = (rawValue: string) => {
-  const digits = rawValue.replace(/\D/g, "").slice(0, 4);
-
-  if (!digits.length) {
-    return "";
-  }
-
-  if (digits.length <= 2) {
-    return digits;
-  }
-
-  if (digits.length === 3) {
-    return `${digits.slice(0, 1)}:${digits.slice(1)}`;
-  }
-
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-};
-
-const normalizeTimeOnBlur = (rawValue: string) => {
-  const digits = rawValue.replace(/\D/g, "").slice(0, 4);
-
-  if (!digits.length) {
-    return "";
-  }
-
-  if (digits.length <= 2) {
-    const hour = Number(digits);
-
-    if (!Number.isNaN(hour) && hour >= 0 && hour <= 23) {
-      return `${String(hour).padStart(2, "0")}:00`;
-    }
-
-    return rawValue;
-  }
-
-  if (digits.length === 3) {
-    const hour = Number(digits.slice(0, 1));
-    const minutes = Number(digits.slice(1));
-
-    if (
-      !Number.isNaN(hour) &&
-      !Number.isNaN(minutes) &&
-      hour >= 0 &&
-      hour <= 23 &&
-      minutes >= 0 &&
-      minutes <= 59
-    ) {
-      return `${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-    }
-
-    return rawValue;
-  }
-
-  const hour = Number(digits.slice(0, 2));
-  const minutes = Number(digits.slice(2));
-
-  if (
-    !Number.isNaN(hour) &&
-    !Number.isNaN(minutes) &&
-    hour >= 0 &&
-    hour <= 23 &&
-    minutes >= 0 &&
-    minutes <= 59
-  ) {
-    return `${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-  }
-
-  return rawValue;
-};
-
-const validateSchedule = (
-  schedule: WeeklySchedule,
-): ScheduleValidationResult => {
-  const activeDays = weekDays.filter((day) => schedule[day.key].ativo);
-  const fieldErrors: Record<string, RangeFieldError> = {};
-
-  if (!activeDays.length) {
-    return {
-      message: "Selecione pelo menos um dia de funcionamento.",
-      fieldErrors,
-    };
-  }
-
-  for (const day of activeDays) {
-    const ranges = schedule[day.key].faixas;
-
-    if (!ranges.length) {
-      return {
-        message: `Adicione ao menos uma faixa de horário para ${day.label}.`,
-        fieldErrors,
-      };
-    }
-
-    for (const [index, range] of ranges.entries()) {
-      const rangeErrorKey = getRangeErrorKey(day.key, index);
-
-      if (!range.inicio || !range.fim) {
-        setFieldError(fieldErrors, rangeErrorKey, {
-          inicio: !range.inicio ? "Informe início." : undefined,
-          fim: !range.fim ? "Informe fim." : undefined,
-          row: "Complete os dois horários.",
-        });
-
-        return {
-          message: `Preencha início e fim para ${day.label} (faixa ${index + 1}).`,
-          fieldErrors,
-        };
-      }
-
-      if (!TIME_PATTERN.test(range.inicio) || !TIME_PATTERN.test(range.fim)) {
-        setFieldError(fieldErrors, rangeErrorKey, {
-          inicio: !TIME_PATTERN.test(range.inicio)
-            ? "Formato HH:mm."
-            : undefined,
-          fim: !TIME_PATTERN.test(range.fim) ? "Formato HH:mm." : undefined,
-          row: "Corrija para HH:mm.",
-        });
-
-        return {
-          message: `Use o padrão HH:mm em ${day.label} (faixa ${index + 1}).`,
-          fieldErrors,
-        };
-      }
-
-      const startMinutes = toMinutes(range.inicio);
-      const endMinutes = toMinutes(range.fim);
-
-      if (endMinutes <= startMinutes) {
-        const isEqualTimes = endMinutes === startMinutes;
-
-        setFieldError(fieldErrors, rangeErrorKey, {
-          inicio: isEqualTimes
-            ? "Não repita o mesmo horário."
-            : "Início maior que fim.",
-          fim: isEqualTimes
-            ? "Não repita o mesmo horário."
-            : "Fim menor que início.",
-          row: isEqualTimes
-            ? "Os horários não devem ser iguais."
-            : "A faixa está invertida.",
-        });
-
-        return {
-          message: isEqualTimes
-            ? `Em ${day.label}, os horários da faixa ${index + 1} não devem ser iguais.`
-            : `Em ${day.label}, o horário final deve ser maior que o inicial (faixa ${index + 1}).`,
-          fieldErrors,
-        };
-      }
-    }
-
-    const rangesWithMinutes = ranges.map((range, index) => ({
-      index,
-      inicio: toMinutes(range.inicio),
-      fim: toMinutes(range.fim),
-    }));
-
-    const sortedRanges = [...rangesWithMinutes].sort(
-      (a, b) => a.inicio - b.inicio,
-    );
-
-    for (let i = 1; i < sortedRanges.length; i += 1) {
-      const previousRange = sortedRanges[i - 1];
-      const currentRange = sortedRanges[i];
-
-      if (currentRange.inicio < previousRange.fim) {
-        setFieldError(
-          fieldErrors,
-          getRangeErrorKey(day.key, previousRange.index),
-          {
-            inicio: "Conflito com outra faixa.",
-            fim: "Conflito com outra faixa.",
-            row: "Esta faixa sobrepõe outra.",
-          },
-        );
-
-        setFieldError(
-          fieldErrors,
-          getRangeErrorKey(day.key, currentRange.index),
-          {
-            inicio: "Conflito com outra faixa.",
-            fim: "Conflito com outra faixa.",
-            row: "Esta faixa sobrepõe outra.",
-          },
-        );
-
-        return {
-          message: `As faixas ${previousRange.index + 1} e ${currentRange.index + 1} de ${day.label} estão sobrepostas.`,
-          fieldErrors,
-        };
-      }
-    }
-  }
-
-  return {
-    message: null,
-    fieldErrors,
-  };
-};
-
-const buildSchedulePayload = (schedule: WeeklySchedule) =>
-  weekDays.reduce(
-    (acc, day) => {
-      const daySchedule = schedule[day.key];
-
-      if (!daySchedule.ativo) {
-        return acc;
-      }
-
-      acc[day.key] = daySchedule.faixas
-        .map((range) => `${range.inicio}-${range.fim}`)
-        .join(", ");
-
-      return acc;
-    },
-    {} as Record<string, string>,
-  );
 
 const parseUserSession = (
   data: Partial<UserSession> | undefined,
@@ -469,7 +198,7 @@ const initialFormValues: FormValues = {
   localizacao: "",
   cnpj: "",
   razao_social: "",
-  categoria: "Geral",
+  categoria: CATEGORY_OPTIONS[0],
   instagram: "",
   servicos_oferecidos: "",
   tecnicas_utilizadas: "",
@@ -503,6 +232,40 @@ const ErrorBadge = ({ message }: { message: string }) => (
   </span>
 );
 
+interface NumberFieldProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const NumberField = ({ value, onChange }: NumberFieldProps) => {
+  const isSemNumero = value === SEM_NUMERO;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex h-4 items-center justify-between gap-2">
+        <span className="text-xs font-medium text-slate-600">Número</span>
+        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+          <input
+            type="checkbox"
+            checked={isSemNumero}
+            onChange={(event) =>
+              onChange(event.target.checked ? SEM_NUMERO : "")
+            }
+            className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
+          />
+          <span>S/N</span>
+        </label>
+      </div>
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={isSemNumero}
+        placeholder="Número"
+      />
+    </div>
+  );
+};
+
 interface SearchableOption {
   value: string;
   label: string;
@@ -515,6 +278,7 @@ interface SearchableSelectProps {
   placeholder: string;
   disabled?: boolean;
   loading?: boolean;
+  flat?: boolean;
 }
 
 const SearchableSelect = ({
@@ -524,15 +288,29 @@ const SearchableSelect = ({
   placeholder,
   disabled = false,
   loading = false,
+  flat = false,
 }: SearchableSelectProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [dropdownRect, setDropdownRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+  } | null>(null);
   const selectedOption = options.find((option) => option.value === value);
   const [query, setQuery] = useState(selectedOption?.label ?? "");
   const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isArmed, setIsArmed] = useState(false);
+  const fieldName = useId();
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !containerRef.current?.contains(target) &&
+        !dropdownRef.current?.contains(target)
+      ) {
         setIsOpen(false);
         setQuery(selectedOption?.label ?? "");
       }
@@ -542,27 +320,103 @@ const SearchableSelect = ({
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [selectedOption?.label]);
 
-  const normalizedQuery = query.trim().toLocaleLowerCase();
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const updateRect = () => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        setDropdownRect({
+          left: rect.left,
+          top: rect.bottom + 4,
+          width: rect.width,
+        });
+      }
+    };
+
+    updateRect();
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect, true);
+    return () => {
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+    };
+  }, [isOpen]);
+
+  const normalizeText = (text: string) =>
+    text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase();
+  const normalizedQuery = normalizeText(query.trim());
   const filteredOptions = options.filter((option) =>
-    `${option.label} ${option.value}`
-      .toLocaleLowerCase()
-      .includes(normalizedQuery),
+    normalizeText(`${option.label} ${option.value}`).includes(normalizedQuery),
   );
+
+  const selectOption = (option: SearchableOption) => {
+    onChange(option.value);
+    setQuery(option.label);
+    setIsOpen(false);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setIsOpen(true);
+      if (filteredOptions.length) {
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        setActiveIndex(
+          (prev) =>
+            (prev + step + filteredOptions.length) % filteredOptions.length,
+        );
+      }
+    } else if (event.key === "Enter") {
+      if (isOpen) {
+        event.preventDefault();
+        const option = filteredOptions[activeIndex] ?? filteredOptions[0];
+        if (option) {
+          selectOption(option);
+        }
+      }
+    } else if (event.key === "Escape") {
+      setIsOpen(false);
+      setQuery(selectedOption?.label ?? "");
+    }
+  };
 
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
         <input
-          type="text"
+          type="search"
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-autocomplete="list"
+          name={`select-${fieldName}`}
+          id={`select-${fieldName}`}
+          autoComplete="off"
+          readOnly={!isArmed}
+          autoCorrect="off"
+          spellCheck={false}
+          data-lpignore="true"
+          data-form-type="other"
           value={query}
           disabled={disabled}
           placeholder={loading ? "Carregando..." : placeholder}
-          onFocus={() => setIsOpen(true)}
-          onChange={(event) => {
-            setQuery(event.target.value);
+          onFocus={() => {
+            setIsArmed(true);
             setIsOpen(true);
           }}
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+          onBlur={() => setIsArmed(false)}
+          onKeyDown={handleKeyDown}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setActiveIndex(0);
+            setIsOpen(true);
+          }}
+          className={`w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm ${flat ? "" : "shadow-sm"} focus:outline-none focus:ring-2 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400`}
         />
         <ChevronDown
           className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -570,39 +424,50 @@ const SearchableSelect = ({
         />
       </div>
 
-      {isOpen && !disabled ? (
-        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-          {loading ? (
-            <p className="px-3 py-2 text-sm text-slate-500">
-              Carregando opções...
-            </p>
-          ) : filteredOptions.length ? (
-            filteredOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  onChange(option.value);
-                  setQuery(option.label);
-                  setIsOpen(false);
-                }}
-                className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-emerald-50 hover:text-emerald-900 ${
-                  option.value === value
-                    ? "bg-emerald-100 font-semibold text-emerald-900"
-                    : "text-slate-700"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))
-          ) : (
-            <p className="px-3 py-2 text-sm text-slate-500">
-              Nenhuma opção encontrada.
-            </p>
-          )}
-        </div>
-      ) : null}
+      {isOpen && !disabled && dropdownRect
+        ? createPortal(
+            <div
+              ref={dropdownRef}
+              style={{
+                position: "fixed",
+                left: dropdownRect.left,
+                top: dropdownRect.top,
+                width: dropdownRect.width,
+              }}
+              className="z-[1000] max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+            >
+              {loading ? (
+                <p className="px-3 py-2 text-sm text-slate-500">
+                  Carregando opções...
+                </p>
+              ) : filteredOptions.length ? (
+                filteredOptions.map((option, index) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => selectOption(option)}
+                    className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-emerald-50 hover:text-emerald-900 ${
+                      option.value === value
+                        ? "bg-emerald-100 font-semibold text-emerald-900"
+                        : index === activeIndex
+                          ? "bg-emerald-50 text-emerald-900"
+                          : "text-slate-700"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))
+              ) : (
+                <p className="px-3 py-2 text-sm text-slate-500">
+                  Nenhuma opção encontrada.
+                </p>
+              )}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 };
@@ -671,7 +536,9 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     useState<LocationInputMode>("manual");
   const [locationToggleThumb, setLocationToggleThumb] = useState({
     left: 0,
+    top: 0,
     width: 0,
+    height: 0,
   });
   const [cepValue, setCepValue] = useState("");
   const [cepAddress, setCepAddress] = useState<ViaCepAddress | null>(null);
@@ -679,8 +546,14 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
   const [cepComplemento, setCepComplemento] = useState("");
   const [isFetchingCep, setIsFetchingCep] = useState(false);
   const [cepError, setCepError] = useState<string | null>(null);
+  const [manualAddress, setManualAddress] = useState<ManualAddress>(
+    initialManualAddress(),
+  );
+  const [detectedLocation, setDetectedLocation] = useState<string | null>(null);
   const cepModeButtonRef = useRef<HTMLButtonElement | null>(null);
   const manualModeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const geoModeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const geoRequestIdRef = useRef(0);
   const scheduleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
@@ -807,10 +680,11 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       return;
     }
 
-    const activeButton =
-      locationInputMode === "cep"
-        ? cepModeButtonRef.current
-        : manualModeButtonRef.current;
+    const activeButton = {
+      cep: cepModeButtonRef.current,
+      manual: manualModeButtonRef.current,
+      geo: geoModeButtonRef.current,
+    }[locationInputMode];
 
     if (!activeButton) {
       return;
@@ -828,7 +702,9 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
       setLocationToggleThumb({
         left: buttonRect.left - containerRect.left - container.clientLeft,
+        top: buttonRect.top - containerRect.top - container.clientTop,
         width: buttonRect.width,
+        height: buttonRect.height,
       });
     };
 
@@ -975,28 +851,59 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     setSuccessMessage(null);
   };
 
+  const composeGeoLocation = (label: string, numero: string, comp: string) =>
+    [numero.trim(), comp.trim(), label].filter(Boolean).join(", ");
+
   const handleUseCurrentLocation = async () => {
+    const requestId = ++geoRequestIdRef.current;
     setIsLocating(true);
     setLocationError(null);
+    setDetectedLocation(null);
 
     try {
       const label = await getCurrentLocationLabel();
-      setLocationInputMode("manual");
-      setCepValue("");
-      setCepAddress(null);
-      setCepNumero("");
-      setCepComplemento("");
-      setCepError(null);
-      setValues((prev) => ({ ...prev, localizacao: label }));
+
+      if (requestId !== geoRequestIdRef.current) {
+        return;
+      }
+
+      setDetectedLocation(label);
+      setValues((prev) => ({
+        ...prev,
+        localizacao: composeGeoLocation(label, cepNumero, cepComplemento),
+      }));
       setErrors((prev) => {
         const nextErrors = { ...prev };
         delete nextErrors.localizacao;
         return nextErrors;
       });
     } catch (error) {
-      setLocationError(getGeolocationErrorMessage(error));
+      if (requestId === geoRequestIdRef.current) {
+        setValues((prev) => ({ ...prev, localizacao: "" }));
+        setLocationError(getGeolocationErrorMessage(error));
+      }
     } finally {
-      setIsLocating(false);
+      if (requestId === geoRequestIdRef.current) {
+        setIsLocating(false);
+      }
+    }
+  };
+
+  const handleGeoDetailsChange = (patch: {
+    numero?: string;
+    complemento?: string;
+  }) => {
+    const numero = patch.numero ?? cepNumero;
+    const complemento = patch.complemento ?? cepComplemento;
+
+    setCepNumero(numero);
+    setCepComplemento(complemento);
+
+    if (detectedLocation) {
+      setValues((prev) => ({
+        ...prev,
+        localizacao: composeGeoLocation(detectedLocation, numero, complemento),
+      }));
     }
   };
 
@@ -1021,6 +928,10 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
   const handleFixedLocationToggle = (checked: boolean) => {
     setHasNoFixedLocation(checked);
+    if (checked) {
+      geoRequestIdRef.current += 1;
+      setIsLocating(false);
+    }
     setLocationError(null);
     setErrors((prev) => {
       const nextErrors = { ...prev };
@@ -1035,6 +946,8 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       setCepNumero("");
       setCepComplemento("");
       setCepError(null);
+      setManualAddress(initialManualAddress());
+      setDetectedLocation(null);
       openServiceLocationModal();
     }
   };
@@ -1044,6 +957,8 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       return;
     }
 
+    geoRequestIdRef.current += 1;
+    setIsLocating(false);
     setLocationInputMode(mode);
     setValues((prev) => ({ ...prev, localizacao: "" }));
     setCepValue("");
@@ -1051,12 +966,68 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     setCepNumero("");
     setCepComplemento("");
     setCepError(null);
+    setManualAddress(initialManualAddress());
+    setDetectedLocation(null);
     setLocationError(null);
     setErrors((prev) => {
       const nextErrors = { ...prev };
       delete nextErrors.localizacao;
       return nextErrors;
     });
+
+    if (mode === "geo") {
+      void handleUseCurrentLocation();
+    }
+  };
+
+  const ensureCitiesLoaded = async (uf: string) => {
+    if (!uf || citiesByState[uf]) {
+      return;
+    }
+
+    setLoadingCitiesByState((prev) => ({ ...prev, [uf]: true }));
+
+    try {
+      const response = await fetch(
+        `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`,
+      );
+
+      if (!response.ok) {
+        throw new Error("Falha ao buscar cidades.");
+      }
+
+      const cities = (await response.json()) as IbgeCity[];
+      setCitiesByState((prev) => ({ ...prev, [uf]: cities }));
+    } catch {
+      setServerError("Não foi possível carregar as cidades desse estado.");
+    } finally {
+      setLoadingCitiesByState((prev) => ({ ...prev, [uf]: false }));
+    }
+  };
+
+  const handleManualAddressChange = (patch: Partial<ManualAddress>) => {
+    const nextAddress = { ...manualAddress, ...patch };
+
+    setManualAddress(nextAddress);
+    setDetectedLocation(null);
+    setValues((prev) => ({
+      ...prev,
+      localizacao: composeManualLocation(nextAddress),
+    }));
+    setErrors((prev) => {
+      if (!prev.localizacao) {
+        return prev;
+      }
+
+      const nextErrors = { ...prev };
+      delete nextErrors.localizacao;
+      return nextErrors;
+    });
+    setServerError(null);
+
+    if (patch.uf) {
+      void ensureCitiesLoaded(patch.uf);
+    }
   };
 
   const handleCepChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -1127,27 +1098,8 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       });
     });
 
-    if (field !== "state" || !value || citiesByState[value]) {
-      return;
-    }
-
-    setLoadingCitiesByState((prev) => ({ ...prev, [value]: true }));
-
-    try {
-      const response = await fetch(
-        `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${value}/municipios`,
-      );
-
-      if (!response.ok) {
-        throw new Error("Falha ao buscar cidades.");
-      }
-
-      const cities = (await response.json()) as IbgeCity[];
-      setCitiesByState((prev) => ({ ...prev, [value]: cities }));
-    } catch {
-      setServerError("Não foi possível carregar as cidades desse estado.");
-    } finally {
-      setLoadingCitiesByState((prev) => ({ ...prev, [value]: false }));
+    if (field === "state") {
+      await ensureCitiesLoaded(value);
     }
   };
 
@@ -1566,7 +1518,10 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
         newErrors.email = "E-mail inválido";
       }
       if (!hasNoFixedLocation && !formValues.localizacao.trim()) {
-        newErrors.localizacao = "Localização é obrigatória";
+        newErrors.localizacao =
+          locationInputMode === "manual" && !isManualAddressEmpty(manualAddress)
+            ? "Preencha logradouro, bairro, UF e cidade"
+            : "Localização é obrigatória";
       }
       if (
         hasNoFixedLocation &&
@@ -1804,6 +1759,8 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       setCepNumero("");
       setCepComplemento("");
       setCepError(null);
+      setManualAddress(initialManualAddress());
+      setDetectedLocation(null);
       setCurrentStep(1);
       onLoginSuccess(session);
     } catch (error: unknown) {
@@ -1962,13 +1919,15 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
               </span>
 
               {!hasNoFixedLocation ? (
-                <div className="relative mt-1 grid w-full grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold sm:w-fit sm:rounded-full">
+                <div className="relative mt-1 grid w-full grid-cols-1 gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1 text-xs font-semibold sm:w-fit sm:grid-cols-3 sm:rounded-full">
                   <span
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-y-1 rounded-xl bg-emerald-700 shadow-sm transition-[left,width] duration-300 ease-in-out sm:rounded-full"
+                    className="pointer-events-none absolute rounded-xl bg-emerald-700 shadow-sm transition-[left,top,width,height] duration-300 ease-in-out sm:rounded-full"
                     style={{
                       left: locationToggleThumb.left,
+                      top: locationToggleThumb.top,
                       width: locationToggleThumb.width,
+                      height: locationToggleThumb.height,
                     }}
                   />
                   <button
@@ -1995,6 +1954,18 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   >
                     Preencher por extenso
                   </button>
+                  <button
+                    ref={geoModeButtonRef}
+                    type="button"
+                    onClick={() => handleLocationModeChange("geo")}
+                    className={`relative z-10 min-w-0 rounded-xl px-2 py-2 text-center transition-colors duration-200 sm:whitespace-nowrap sm:rounded-full sm:px-3 sm:py-1.5 ${
+                      locationInputMode === "geo"
+                        ? "text-white"
+                        : "text-slate-600 hover:text-emerald-700"
+                    }`}
+                  >
+                    Preencher com minha localização
+                  </button>
                 </div>
               ) : null}
 
@@ -2007,12 +1978,158 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   placeholder="Use o botão para escolher as cidades"
                 />
               ) : locationInputMode === "manual" ? (
-                <Input
-                  name="localizacao"
-                  value={values.localizacao}
-                  onChange={handleChange}
-                  placeholder="Endereço, bairro ou cidade"
-                />
+                <div
+                  className="grid gap-3 sm:grid-cols-2"
+                  data-field="localizacao"
+                >
+                  <label className="space-y-1 sm:col-span-2">
+                    <span className="text-xs font-medium text-slate-600">
+                      Logradouro
+                    </span>
+                    <Input
+                      value={manualAddress.logradouro}
+                      onChange={(event) =>
+                        handleManualAddressChange({
+                          logradouro: event.target.value,
+                        })
+                      }
+                      placeholder="Rua, avenida, travessa..."
+                    />
+                  </label>
+                  <NumberField
+                    value={manualAddress.numero}
+                    onChange={(numero) => handleManualAddressChange({ numero })}
+                  />
+                  <label className="space-y-1">
+                    <span className="flex h-4 items-center text-xs font-medium text-slate-600">
+                      Complemento
+                    </span>
+                    <Input
+                      value={manualAddress.complemento}
+                      onChange={(event) =>
+                        handleManualAddressChange({
+                          complemento: event.target.value,
+                        })
+                      }
+                      placeholder="Apto, bloco, referência (opcional)"
+                    />
+                  </label>
+                  <label className="space-y-1 sm:col-span-2">
+                    <span className="text-xs font-medium text-slate-600">
+                      Bairro
+                    </span>
+                    <Input
+                      value={manualAddress.bairro}
+                      onChange={(event) =>
+                        handleManualAddressChange({
+                          bairro: event.target.value,
+                        })
+                      }
+                      placeholder="Digite o bairro"
+                    />
+                  </label>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-slate-600">
+                      UF
+                    </span>
+                    <SearchableSelect
+                      flat
+                      value={manualAddress.uf}
+                      onChange={(uf) =>
+                        handleManualAddressChange({ uf, cidade: "" })
+                      }
+                      placeholder="Digite a UF"
+                      options={ufs.map((state) => ({
+                        value: state.sigla,
+                        label: `${state.nome} (${state.sigla})`,
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-slate-600">
+                      Cidade
+                    </span>
+                    <SearchableSelect
+                      flat
+                      key={`manual-city-${manualAddress.uf}-${manualAddress.cidade}`}
+                      value={manualAddress.cidade}
+                      onChange={(cidade) =>
+                        handleManualAddressChange({ cidade })
+                      }
+                      disabled={
+                        !manualAddress.uf ||
+                        !(citiesByState[manualAddress.uf] ?? []).length
+                      }
+                      placeholder={
+                        loadingCitiesByState[manualAddress.uf]
+                          ? "Carregando cidades..."
+                          : manualAddress.uf
+                            ? "Digite a cidade"
+                            : "Escolha a UF primeiro"
+                      }
+                      loading={loadingCitiesByState[manualAddress.uf]}
+                      options={(citiesByState[manualAddress.uf] ?? []).map(
+                        (city) => ({ value: city.nome, label: city.nome }),
+                      )}
+                    />
+                  </div>
+                </div>
+              ) : locationInputMode === "geo" ? (
+                <div className="space-y-3" data-field="localizacao">
+                  {isLocating ? (
+                    <p className="text-xs text-slate-500">
+                      Obtendo sua localização...
+                    </p>
+                  ) : null}
+                  {locationError ? (
+                    <ErrorBadge message={locationError} />
+                  ) : null}
+                  {detectedLocation ? (
+                    <>
+                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                          Localização detectada
+                        </p>
+                        <p className="mt-1">{detectedLocation}</p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <NumberField
+                          value={cepNumero}
+                          onChange={(numero) =>
+                            handleGeoDetailsChange({ numero })
+                          }
+                        />
+                        <label className="space-y-1">
+                          <span className="flex h-4 items-center text-xs font-medium text-slate-600">
+                            Complemento
+                          </span>
+                          <Input
+                            value={cepComplemento}
+                            onChange={(event) =>
+                              handleGeoDetailsChange({
+                                complemento: event.target.value,
+                              })
+                            }
+                            placeholder="Apto, bloco, referência (opcional)"
+                          />
+                        </label>
+                      </div>
+                    </>
+                  ) : !isLocating ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleUseCurrentLocation}
+                      className="px-3 py-1.5 text-xs"
+                    >
+                      <LocateFixed
+                        className="mr-1.5 h-3.5 w-3.5"
+                        strokeWidth={2}
+                      />
+                      Tentar obter minha localização
+                    </Button>
+                  ) : null}
+                </div>
               ) : (
                 <div className="space-y-3">
                   <Input
@@ -2032,31 +2149,28 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   {cepAddress ? (
                     <>
                       <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900">
-                        {[
-                          cepAddress.logradouro,
-                          cepAddress.bairro,
-                          [cepAddress.localidade, cepAddress.uf]
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                          CEP detectado
+                        </p>
+                        <p className="mt-1">
+                          {[
+                            cepAddress.logradouro,
+                            cepAddress.bairro,
+                            [cepAddress.localidade, cepAddress.uf]
+                              .filter(Boolean)
+                              .join(" - "),
+                          ]
                             .filter(Boolean)
-                            .join(" - "),
-                        ]
-                          .filter(Boolean)
-                          .join(", ")}
+                            .join(", ")}
+                        </p>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
+                        <NumberField
+                          value={cepNumero}
+                          onChange={setCepNumero}
+                        />
                         <label className="space-y-1">
-                          <span className="text-xs font-medium text-slate-600">
-                            Número
-                          </span>
-                          <Input
-                            value={cepNumero}
-                            onChange={(event) =>
-                              setCepNumero(event.target.value)
-                            }
-                            placeholder="Número"
-                          />
-                        </label>
-                        <label className="space-y-1">
-                          <span className="text-xs font-medium text-slate-600">
+                          <span className="flex h-4 items-center text-xs font-medium text-slate-600">
                             Complemento
                           </span>
                           <Input
@@ -2085,38 +2199,6 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   />
                   <span>Não possuo local fixo de atendimento</span>
                 </label>
-                {!hasNoFixedLocation ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleUseCurrentLocation}
-                    disabled={isLocating}
-                    aria-label="Usar minha localização"
-                    className="w-full shrink-0 px-3 py-1.5 text-xs disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
-                  >
-                    <LocateFixed
-                      className="mr-1.5 h-3.5 w-3.5"
-                      strokeWidth={2}
-                    />
-                    {isLocating ? "Localizando..." : "Usar minha localização"}
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleUseCurrentLocation}
-                    disabled
-                    aria-label="Usar minha localização indisponível enquanto o atendimento sem local fixo estiver ativo"
-                    title="Desmarque 'Não possuo local fixo de atendimento' para usar sua localização"
-                    className="w-full shrink-0 px-3 py-1.5 text-xs disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
-                  >
-                    <LocateFixed
-                      className="mr-1.5 h-3.5 w-3.5"
-                      strokeWidth={2}
-                    />
-                    Usar minha localização
-                  </Button>
-                )}
               </div>
               {hasNoFixedLocation ? (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
@@ -2156,7 +2238,6 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   </Button>
                 </div>
               ) : null}
-              {locationError ? <ErrorBadge message={locationError} /> : null}
               {errors.localizacao && (
                 <ErrorBadge message={errors.localizacao} />
               )}
@@ -2405,7 +2486,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                 >
-                  {categoryOptions.map((category) => (
+                  {CATEGORY_OPTIONS.map((category) => (
                     <option key={category} value={category}>
                       {category}
                     </option>
@@ -2678,11 +2759,12 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                       key={`service-city-${index}`}
                       className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
                     >
-                      <label className="space-y-1">
+                      <div className="space-y-1">
                         <span className="text-xs font-semibold text-slate-700">
                           Estado
                         </span>
                         <SearchableSelect
+                          flat
                           key={`state-${index}-${serviceCity.state}`}
                           value={serviceCity.state}
                           onChange={(state) =>
@@ -2695,13 +2777,14 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                             label: `${state.nome} (${state.sigla})`,
                           }))}
                         />
-                      </label>
+                      </div>
 
-                      <label className="space-y-1">
+                      <div className="space-y-1">
                         <span className="text-xs font-semibold text-slate-700">
                           Cidade
                         </span>
                         <SearchableSelect
+                          flat
                           key={`city-${index}-${serviceCity.state}-${serviceCity.city}`}
                           value={serviceCity.city}
                           onChange={(city) =>
@@ -2721,7 +2804,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                             label: city.nome,
                           }))}
                         />
-                      </label>
+                      </div>
 
                       <button
                         type="button"

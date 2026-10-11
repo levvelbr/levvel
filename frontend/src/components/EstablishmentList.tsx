@@ -28,12 +28,14 @@ interface EstablishmentListProps {
   selectedCategory?: string | null;
   searchQuery?: string;
   onRequestBooking?: (data: BookingEstablishment) => void;
+  onClearCategoryFilter?: () => void;
 }
 
 export const EstablishmentList = ({
   selectedCategory,
   searchQuery,
   onRequestBooking,
+  onClearCategoryFilter,
 }: EstablishmentListProps) => {
   const [establishments, setEstablishments] = useState<Establishment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -113,6 +115,15 @@ export const EstablishmentList = ({
             {hasSearch ? ` e busca por "${searchQuery}".` : "."}
           </p>
         </div>
+        {selectedCategory && onClearCategoryFilter ? (
+          <button
+            type="button"
+            onClick={onClearCategoryFilter}
+            className="shrink-0 text-sm font-semibold text-emerald-700 underline decoration-emerald-300 underline-offset-4 transition-colors hover:text-emerald-900"
+          >
+            Limpar filtro
+          </button>
+        ) : null}
       </div>
 
       {loading ? (

@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  input[type="checkbox"],
+  input[type="file"]::file-selector-button,
+  select {
+    cursor: pointer;
+  }
+}
+
 html {
   scroll-behavior: smooth;
   overflow-x: clip;
@@ -98,6 +108,22 @@ body {
 
 .establishment-mount-delay-2 {
   animation-delay: 160ms;
+}
+
+@keyframes dataFadeIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.data-fade-in {
+  animation: dataFadeIn 180ms ease-out both;
 }
 
 .fade-up-mount {

@@ -1,4 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -117,15 +123,6 @@ const STATUS_LABELS: Record<Agendamento["status"], string> = {
   cancelado: "Cancelado",
 };
 
-const STATUS_COLORS: Record<Agendamento["status"], string> = {
-  pendente: "bg-amber-100 text-amber-800",
-  confirmado: "bg-emerald-100 text-emerald-800",
-  recusado: "bg-rose-100 text-rose-700",
-  em_andamento: "bg-sky-100 text-sky-800",
-  concluido: "bg-slate-100 text-slate-700",
-  cancelado: "bg-slate-100 text-slate-400",
-};
-
 const PROVIDER_STATUS_COLORS: Record<Agendamento["status"], string> = {
   pendente: "bg-amber-100 text-amber-800",
   confirmado: "bg-emerald-100 text-emerald-800",
@@ -159,6 +156,16 @@ const getProviderBookingCardColors = (status: Agendamento["status"]) => {
   return "border-slate-200 bg-white";
 };
 
+const btnOutlineGreen =
+  "inline-flex items-center justify-center rounded-lg border border-emerald-700 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60";
+
+const GENDER_LABELS: Record<string, string> = {
+  masculino: "Masculino",
+  feminino: "Feminino",
+  nao_binario: "Não binário",
+  outro: "Outro",
+};
+
 const PAYMENT_LABELS: Record<string, string> = {
   dinheiro: "Dinheiro",
   cartao_debito: "Cartão de débito",
@@ -174,9 +181,6 @@ const formatDate = (iso: string) =>
     hour: "2-digit",
     minute: "2-digit",
   });
-
-const inputClass =
-  "h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200";
 
 const groupedInputClass =
   "h-9 w-full border-0 bg-transparent px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-0";
@@ -279,6 +283,22 @@ export const ProfilePage = ({
       initialTab ??
       (searchParams.get("tab") === "bookings" ? "bookings" : "profile"),
   );
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [tabIndicator, setTabIndicator] = useState<{
+    left: number;
+    width: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    const updateIndicator = () => {
+      const el = tabRefs.current[activeTab];
+      if (el) setTabIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+    };
+    updateIndicator();
+    window.addEventListener("resize", updateIndicator);
+    return () => window.removeEventListener("resize", updateIndicator);
+  }, [activeTab, embedded, session?.role]);
+
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [photoUploadLoading, setPhotoUploadLoading] = useState(false);
   const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
@@ -295,9 +315,6 @@ export const ProfilePage = ({
   const [nomeTratamento, setNomeTratamento] = useState("");
   const [genero, setGenero] = useState("");
   const [formaPagamento, setFormaPagamento] = useState("");
-  const [localizacao, setLocalizacao] = useState("");
-  const [email, setEmail] = useState("");
-  const [novaSenha, setNovaSenha] = useState("");
 
   // ── Establishment state ──────────────────────────────────────────────────────
   const [estabProfile, setEstabProfile] =
@@ -364,8 +381,6 @@ export const ProfilePage = ({
           setNomeTratamento(p.nome_tratamento ?? "");
           setGenero(p.genero ?? "");
           setFormaPagamento(p.forma_pagamento_preferida ?? "");
-          setLocalizacao(p.localizacao_inicial ?? "");
-          setEmail(p.email ?? "");
           const preferredName = p.nome_tratamento?.trim() || p.nome_usuario;
           updateSession({
             nome: preferredName,
@@ -528,6 +543,25 @@ export const ProfilePage = ({
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
+  const startClientEdit = () => {
+    if (!clientProfile) return;
+    setNomeTratamento(clientProfile.nome_tratamento ?? "");
+    setGenero(clientProfile.genero ?? "");
+    setFormaPagamento(clientProfile.forma_pagamento_preferida ?? "");
+    setEditSuccess(false);
+    setEditError(null);
+    setSelectedPhotoFile(null);
+    setPhotoUploadError(null);
+    setIsEditing(true);
+  };
+
+  const cancelClientEdit = () => {
+    setIsEditing(false);
+    setEditError(null);
+    setSelectedPhotoFile(null);
+    setPhotoUploadError(null);
+  };
+
   const handleClientUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setEditLoading(true);
@@ -538,10 +572,7 @@ export const ProfilePage = ({
       nome_tratamento: nomeTratamento || null,
       genero: genero || null,
       forma_pagamento_preferida: formaPagamento || null,
-      localizacao_inicial: localizacao || null,
-      email: email || null,
     };
-    if (novaSenha) body.senha = novaSenha;
 
     try {
       const r = await api.patch("/v1/clientes/me/update", body);
@@ -553,7 +584,6 @@ export const ProfilePage = ({
       });
       setEditSuccess(true);
       setIsEditing(false);
-      setNovaSenha("");
     } catch (err: unknown) {
       setEditError(
         err instanceof Error ? err.message : "Erro ao atualizar perfil.",
@@ -970,29 +1000,39 @@ export const ProfilePage = ({
                     />
                     Voltar para início
                   </Link>
-                  <div className="flex w-fit gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => handleChangeTab("profile")}
-                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                        activeTab === "profile"
-                          ? "bg-emerald-700 text-white"
-                          : "text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      Meu perfil
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleChangeTab("bookings")}
-                      className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
-                        activeTab === "bookings"
-                          ? "bg-emerald-700 text-white"
-                          : "text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      Meus agendamentos
-                    </button>
+                  <div className="relative flex w-fit gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+                    {tabIndicator ? (
+                      <span
+                        aria-hidden="true"
+                        className="absolute top-1 bottom-1 rounded-xl bg-emerald-700 transition-[left,width] duration-300 ease-out"
+                        style={{
+                          left: tabIndicator.left,
+                          width: tabIndicator.width,
+                        }}
+                      />
+                    ) : null}
+                    {(
+                      [
+                        ["profile", "Meu perfil"],
+                        ["bookings", "Meus agendamentos"],
+                      ] as const
+                    ).map(([tab, label]) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        ref={(el) => {
+                          tabRefs.current[tab] = el;
+                        }}
+                        onClick={() => handleChangeTab(tab)}
+                        className={`relative z-10 rounded-xl px-4 py-2 text-sm font-semibold transition-colors duration-300 ${
+                          activeTab === tab
+                            ? "text-white"
+                            : "text-slate-600 hover:text-emerald-800"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               ) : null}
@@ -1001,298 +1041,262 @@ export const ProfilePage = ({
 
           {/* ── Profile tab ── */}
           {activeTab === "profile" && session.role === "cliente" && (
-            <div className="fade-up-mount space-y-6">
-              {/* Profile info */}
-              <div className={sectionClass}>
-                <div className="mb-4 flex items-start justify-between">
-                  <div className="flex items-start gap-4">
-                    {clientProfile?.foto_perfil_url ? (
+            <div className={`fade-up-mount ${sectionClass}`}>
+              {clientLoading ? (
+                <p className="text-sm text-slate-500">Carregando perfil...</p>
+              ) : clientProfile ? (
+                <div className="data-fade-in space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      {clientProfile.foto_perfil_url ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openPhotoPreview(
+                              clientProfile.foto_perfil_url as string,
+                              "Foto de perfil",
+                            )
+                          }
+                          aria-label="Ampliar foto de perfil"
+                          className="group relative shrink-0 cursor-zoom-in overflow-hidden rounded-2xl"
+                        >
+                          <img
+                            src={clientProfile.foto_perfil_url}
+                            alt="Foto de perfil"
+                            className="h-16 w-16 rounded-2xl object-cover"
+                          />
+                          <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-900/50 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100">
+                            <ZoomIn
+                              className="h-6 w-6 text-white"
+                              strokeWidth={2}
+                            />
+                          </span>
+                        </button>
+                      ) : (
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-lg font-semibold text-slate-500">
+                          {session.nome.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <h1 className="text-xl font-semibold text-slate-900">
+                          {clientProfile.nome_usuario}
+                        </h1>
+                        <p className="text-sm text-slate-500">
+                          {clientProfile.email ?? session.email_ou_cpf}
+                        </p>
+                      </div>
+                    </div>
+                    {!isEditing ? (
                       <button
                         type="button"
-                        onClick={() =>
-                          openPhotoPreview(
-                            clientProfile.foto_perfil_url as string,
-                            "Foto de perfil",
-                          )
-                        }
-                        aria-label="Ampliar foto de perfil"
-                        className="group relative shrink-0 cursor-zoom-in overflow-hidden rounded-2xl"
+                        className={`${btnOutlineGreen} !px-4 !py-2 !text-sm shrink-0`}
+                        onClick={startClientEdit}
                       >
-                        <img
-                          src={clientProfile.foto_perfil_url}
-                          alt="Foto de perfil"
-                          className="h-16 w-16 rounded-2xl object-cover"
-                        />
-                        <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-slate-900/50 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
-                          <ZoomIn
-                            className="h-6 w-6 text-white"
-                            strokeWidth={2}
-                          />
-                        </span>
+                        Editar perfil
                       </button>
                     ) : (
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-lg font-semibold text-slate-500">
-                        {session.nome.charAt(0).toUpperCase()}
+                      <div className="data-fade-in flex shrink-0 gap-2">
+                        <button
+                          type="submit"
+                          form="client-edit-form"
+                          disabled={editLoading}
+                          className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                        >
+                          {editLoading ? "Salvando..." : "Salvar Alterações"}
+                        </button>
+                        <button
+                          type="button"
+                          className={`${btnOutlineGreen} !px-4 !py-2 !text-sm`}
+                          disabled={editLoading}
+                          onClick={cancelClientEdit}
+                        >
+                          Cancelar
+                        </button>
                       </div>
                     )}
-                    <div
-                      key={clientLoading ? "loading" : "loaded"}
-                      className="data-fade-in"
-                    >
-                      <h1 className="text-xl font-semibold text-slate-900">
-                        {clientLoading
-                          ? "Carregando..."
-                          : clientProfile?.nome_usuario}
-                      </h1>
-                      <p className="text-sm text-slate-500">
-                        {clientProfile?.email ?? session.email_ou_cpf}
+                  </div>
+
+                  {isEditing && (
+                    <div className="data-fade-in rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-900">
+                        Foto de perfil
                       </p>
-                    </div>
-                  </div>
-                  {!isEditing && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditSuccess(false);
-                        setEditError(null);
-                        setIsEditing(true);
-                      }}
-                      className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                    >
-                      Editar
-                    </button>
-                  )}
-                </div>
-
-                <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-900">
-                    Foto de perfil
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Envie uma imagem para aparecer no seu perfil e no cabeçalho.
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0] ?? null;
-                        setSelectedPhotoFile(file);
-                        setPhotoUploadError(null);
-                      }}
-                      className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800"
-                    />
-                    <button
-                      type="button"
-                      disabled={!selectedPhotoFile || photoUploadLoading}
-                      onClick={handlePhotoUpload}
-                      className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
-                    >
-                      {photoUploadLoading ? "Enviando..." : "Salvar foto"}
-                    </button>
-                  </div>
-                  {photoUploadError ? (
-                    <p className="mt-2 text-sm text-rose-700">
-                      {photoUploadError}
-                    </p>
-                  ) : null}
-                </div>
-
-                {clientProfile && !isEditing && (
-                  <dl className="data-fade-in grid gap-3 text-sm sm:grid-cols-2">
-                    <div>
-                      <dt className="font-semibold text-slate-900">
-                        Como prefere ser chamado
-                      </dt>
-                      <dd className="text-slate-600">
-                        {clientProfile.nome_tratamento ?? "—"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-slate-900">CPF</dt>
-                      <dd className="text-slate-600">
-                        {clientProfile.cpf.replace(
-                          /(\d{3})(\d{3})(\d{3})(\d{2})/,
-                          "$1.$2.$3-$4",
-                        )}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-slate-900">
-                        Data de nascimento
-                      </dt>
-                      <dd className="text-slate-600">
-                        {new Date(
-                          clientProfile.data_nascimento + "T00:00:00",
-                        ).toLocaleDateString("pt-BR")}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-slate-900">Gênero</dt>
-                      <dd className="text-slate-600">
-                        {clientProfile.genero ?? "—"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-slate-900">
-                        Pagamento preferido
-                      </dt>
-                      <dd className="text-slate-600">
-                        {PAYMENT_LABELS[
-                          clientProfile.forma_pagamento_preferida ?? ""
-                        ] ?? "—"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-slate-900">
-                        Localização
-                      </dt>
-                      <dd className="text-slate-600">
-                        {clientProfile.localizacao_inicial ?? "—"}
-                      </dd>
-                    </div>
-                  </dl>
-                )}
-              </div>
-
-              {/* Edit form */}
-              {isEditing && (
-                <div className={sectionClass}>
-                  <h2 className="mb-4 text-lg font-semibold text-slate-900">
-                    Editar perfil
-                  </h2>
-
-                  {editError && (
-                    <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                      {editError}
-                    </div>
-                  )}
-
-                  <form onSubmit={handleClientUpdate} className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700">
-                          Como prefere ser chamado
-                        </label>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Envie uma imagem para aparecer no seu perfil e no
+                        cabeçalho.
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
                         <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            setSelectedPhotoFile(file);
+                            setPhotoUploadError(null);
+                          }}
+                          className="text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800"
+                        />
+                        <button
+                          type="button"
+                          disabled={!selectedPhotoFile || photoUploadLoading}
+                          onClick={handlePhotoUpload}
+                          className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${accentButton} disabled:opacity-60`}
+                        >
+                          {photoUploadLoading ? "Enviando..." : "Salvar foto"}
+                        </button>
+                      </div>
+                      {photoUploadError ? (
+                        <p className="mt-2 text-sm text-rose-700">
+                          {photoUploadError}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {editSuccess && !isEditing && (
+                    <div
+                      role="status"
+                      className="flex items-start justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700"
+                    >
+                      <p>Perfil atualizado com sucesso.</p>
+                      <button
+                        type="button"
+                        aria-label="Fechar alerta"
+                        onClick={() => setEditSuccess(false)}
+                        className="shrink-0 rounded-md p-0.5 transition-colors hover:bg-emerald-100"
+                      >
+                        <X className="h-4 w-4" strokeWidth={2} />
+                      </button>
+                    </div>
+                  )}
+
+                  {isEditing && (
+                    <form
+                      id="client-edit-form"
+                      onSubmit={handleClientUpdate}
+                      className="data-fade-in grid gap-4 md:grid-cols-2"
+                    >
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-slate-700">
+                          Como prefere ser chamado
+                        </span>
+                        <Input
+                          className="focus:ring-emerald-300!"
                           value={nomeTratamento}
                           onChange={(e) => setNomeTratamento(e.target.value)}
                           placeholder="Apelido ou forma de tratamento"
-                          className={inputClass}
                         />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700">
+                      </label>
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-slate-700">
                           Gênero
-                        </label>
-                        <input
+                        </span>
+                        <select
                           value={genero}
                           onChange={(e) => setGenero(e.target.value)}
-                          placeholder="Ex: Feminino, Masculino, Outro"
-                          className={inputClass}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700">
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                        >
+                          <option value="">Selecione</option>
+                          {Object.entries(GENDER_LABELS).map(
+                            ([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </label>
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-slate-700">
                           Pagamento preferido
-                        </label>
+                        </span>
                         <select
                           value={formaPagamento}
                           onChange={(e) => setFormaPagamento(e.target.value)}
-                          className={inputClass}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-300"
                         >
                           <option value="">Selecione</option>
-                          <option value="dinheiro">Dinheiro</option>
-                          <option value="cartao_debito">
-                            Cartão de débito
-                          </option>
-                          <option value="cartao_credito">
-                            Cartão de crédito
-                          </option>
-                          <option value="pix">PIX</option>
+                          {Object.entries(PAYMENT_LABELS).map(
+                            ([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ),
+                          )}
                         </select>
-                      </div>
+                      </label>
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700">
-                          Localização
-                        </label>
-                        <input
-                          value={localizacao}
-                          onChange={(e) => setLocalizacao(e.target.value)}
-                          placeholder="Bairro ou cidade"
-                          className={inputClass}
-                        />
-                      </div>
+                      {editError && (
+                        <div
+                          role="alert"
+                          className="flex items-start justify-between gap-3 rounded-xl bg-rose-50 px-4 py-2 text-sm text-rose-700 md:col-span-2"
+                        >
+                          <p>{editError}</p>
+                          <button
+                            type="button"
+                            aria-label="Fechar alerta"
+                            onClick={() => setEditError(null)}
+                            className="shrink-0 rounded-md p-0.5 text-rose-700 transition-colors hover:bg-rose-100"
+                          >
+                            <X className="h-4 w-4" strokeWidth={2} />
+                          </button>
+                        </div>
+                      )}
+                    </form>
+                  )}
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700">
-                          E-mail
-                        </label>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="seu@email.com"
-                          className={inputClass}
-                        />
+                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                    {(
+                      [
+                        ...(isEditing
+                          ? []
+                          : [
+                              [
+                                "Como prefere ser chamado",
+                                clientProfile.nome_tratamento,
+                              ],
+                            ]),
+                        ["CPF", maskCpf(clientProfile.cpf)],
+                        [
+                          "Data de nascimento",
+                          new Date(
+                            clientProfile.data_nascimento + "T00:00:00",
+                          ).toLocaleDateString("pt-BR"),
+                        ],
+                        ...(isEditing
+                          ? []
+                          : [
+                              [
+                                "Gênero",
+                                GENDER_LABELS[clientProfile.genero ?? ""] ??
+                                  clientProfile.genero,
+                              ],
+                              [
+                                "Pagamento preferido",
+                                PAYMENT_LABELS[
+                                  clientProfile.forma_pagamento_preferida ?? ""
+                                ],
+                              ],
+                            ]),
+                        ["E-mail", clientProfile.email],
+                        ["Localização", clientProfile.localizacao_inicial],
+                      ] as Array<[string, string | null | undefined]>
+                    ).map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="font-semibold text-slate-900">
+                          {label}
+                        </dt>
+                        <dd className="text-slate-600">
+                          {value || "Não informado"}
+                        </dd>
                       </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-700">
-                          Nova senha{" "}
-                          <span className="font-normal text-slate-400">
-                            (deixe em branco para manter)
-                          </span>
-                        </label>
-                        <input
-                          type="password"
-                          value={novaSenha}
-                          onChange={(e) => setNovaSenha(e.target.value)}
-                          placeholder="Mínimo 6 caracteres"
-                          minLength={6}
-                          className={inputClass}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsEditing(false)}
-                        className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={editLoading}
-                        className="flex-1 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
-                      >
-                        {editLoading ? "Salvando..." : "Salvar alterações"}
-                      </button>
-                    </div>
-                  </form>
+                    ))}
+                  </dl>
                 </div>
-              )}
-
-              {editSuccess && !isEditing && (
-                <div
-                  role="status"
-                  className="flex items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
-                >
-                  <p>Perfil atualizado com sucesso.</p>
-                  <button
-                    type="button"
-                    aria-label="Fechar alerta"
-                    onClick={() => setEditSuccess(false)}
-                    className="shrink-0 rounded-md p-0.5 transition-colors hover:bg-emerald-100"
-                  >
-                    <X className="h-4 w-4" strokeWidth={2} />
-                  </button>
-                </div>
+              ) : (
+                <p className="text-sm text-rose-600">
+                  Não foi possível carregar o perfil.
+                </p>
               )}
             </div>
           )}
@@ -1717,7 +1721,7 @@ export const ProfilePage = ({
                                     }`}
                                   >
                                     <span
-                                      className={`w-32 text-sm font-semibold ${ativo ? "text-blue-900" : "text-slate-400"}`}
+                                      className={`w-44 shrink-0 whitespace-nowrap text-sm font-semibold ${ativo ? "text-blue-900" : "text-slate-400"}`}
                                     >
                                       {day.label}
                                       {day.key === todayKey ? (
@@ -1950,43 +1954,30 @@ export const ProfilePage = ({
                   </div>
                 ) : (
                   filteredAgendamentos.map((ag) => {
-                    const isCollapsed =
-                      isEstablishment && !expandedBookingIds.has(ag.id);
+                    const isCollapsed = !expandedBookingIds.has(ag.id);
                     return (
                       <div
                         key={ag.id}
-                        onClick={
-                          isEstablishment
-                            ? () =>
-                                setExpandedBookingIds((prev) => {
-                                  const next = new Set(prev);
-                                  if (!next.delete(ag.id)) next.add(ag.id);
-                                  return next;
-                                })
-                            : undefined
+                        onClick={() =>
+                          setExpandedBookingIds((prev) => {
+                            const next = new Set(prev);
+                            if (!next.delete(ag.id)) next.add(ag.id);
+                            return next;
+                          })
                         }
-                        className={`data-fade-in ${isEstablishment ? `flex cursor-pointer flex-col rounded-2xl border p-4 transition-shadow hover:shadow-sm` : "rounded-3xl border p-5"} shadow-xs ${isEstablishment ? getProviderBookingCardColors(ag.status) : "border-slate-200 bg-white"}`}
+                        className={`data-fade-in flex cursor-pointer flex-col rounded-2xl border p-4 shadow-xs transition-shadow hover:shadow-sm ${getProviderBookingCardColors(ag.status)}`}
                       >
                         <div
                           className="flex flex-wrap items-start justify-between gap-2"
-                          aria-expanded={
-                            isEstablishment ? !isCollapsed : undefined
-                          }
-                          role={isEstablishment ? "button" : undefined}
-                          tabIndex={isEstablishment ? 0 : undefined}
-                          onKeyDown={
-                            isEstablishment
-                              ? (event) => {
-                                  if (
-                                    event.key === "Enter" ||
-                                    event.key === " "
-                                  ) {
-                                    event.preventDefault();
-                                    event.currentTarget.click();
-                                  }
-                                }
-                              : undefined
-                          }
+                          aria-expanded={!isCollapsed}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              event.currentTarget.click();
+                            }
+                          }}
                         >
                           <div className="min-w-0 space-y-2">
                             <p className="font-semibold text-slate-900">
@@ -1995,80 +1986,90 @@ export const ProfilePage = ({
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
                             <span
-                              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${isEstablishment ? PROVIDER_STATUS_COLORS[ag.status] : STATUS_COLORS[ag.status]}`}
+                              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${PROVIDER_STATUS_COLORS[ag.status]}`}
                             >
                               {STATUS_LABELS[ag.status]}
                             </span>
-                            {isEstablishment && (
-                              <ChevronDown
-                                className={`h-4 w-4 text-slate-500 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
-                                strokeWidth={2}
-                              />
-                            )}
+                            <ChevronDown
+                              className={`h-4 w-4 text-slate-500 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
+                              strokeWidth={2}
+                            />
                           </div>
                         </div>
 
-                        <div className="mt-2 flex flex-wrap items-end gap-x-6 gap-y-2">
-                          {isEstablishment &&
-                            (
-                              [
-                                {
-                                  label: "Cliente",
-                                  icon: (
-                                    <Contact
-                                      className={`h-4 w-4 text-slate-600`}
-                                    />
-                                  ),
-                                  value:
-                                    clientesAgenda[
-                                      ag.cliente_id
-                                    ]?.nome_tratamento?.trim() ||
-                                    clientesAgenda[ag.cliente_id]
-                                      ?.nome_usuario ||
-                                    "Cliente não identificado",
-                                  bold: true,
-                                },
-                                {
-                                  label: "Data",
-                                  icon: (
-                                    <CalendarDays className="h-4 w-4 text-slate-600" />
-                                  ),
-                                  value: formatDate(ag.data_hora_inicio),
-                                },
-                                ...(isCollapsed
-                                  ? []
-                                  : [
-                                      {
-                                        label: "Duração estimada",
-                                        icon: (
-                                          <ClockFading className="h-4 w-4 text-slate-600" />
-                                        ),
-                                        value: `${ag.duracao_estimada_minutos} min`,
-                                      },
-                                    ]),
-                              ] as Array<{
-                                label: string;
-                                icon: ReactNode;
-                                value: string;
-                                bold?: boolean;
-                              }>
-                            ).map((item) => (
-                              <div key={item.label}>
-                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
-                                  {item.label}
-                                </p>
-                                <div
-                                  className={`flex items-center gap-2 text-sm text-slate-600 ${item.bold ? "font-semibold" : ""}`}
-                                >
-                                  {item.icon}
-                                  {item.value}
-                                </div>
+                        <div
+                          className={`mt-2 ${isEstablishment ? "grid grid-cols-2 items-end gap-x-4 gap-y-3 md:grid-cols-5" : "grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-4"}`}
+                        >
+                          {(
+                            [
+                              ...(isEstablishment
+                                ? [
+                                    {
+                                      label: "Cliente",
+                                      icon: (
+                                        <Contact className="h-4 w-4 text-slate-600" />
+                                      ),
+                                      value:
+                                        clientesAgenda[
+                                          ag.cliente_id
+                                        ]?.nome_tratamento?.trim() ||
+                                        clientesAgenda[ag.cliente_id]
+                                          ?.nome_usuario ||
+                                        "Cliente não identificado",
+                                      bold: true,
+                                    },
+                                  ]
+                                : [
+                                    {
+                                      label: "Profissional",
+                                      icon: (
+                                        <Contact className="h-4 w-4 text-slate-600" />
+                                      ),
+                                      value: ag.profissional_envolvido,
+                                      bold: true,
+                                    },
+                                  ]),
+                              {
+                                label: "Data",
+                                icon: (
+                                  <CalendarDays className="h-4 w-4 text-slate-600" />
+                                ),
+                                value: formatDate(ag.data_hora_inicio),
+                              },
+                              ...(isCollapsed
+                                ? []
+                                : [
+                                    {
+                                      label: "Duração estimada",
+                                      icon: (
+                                        <ClockFading className="h-4 w-4 text-slate-600" />
+                                      ),
+                                      value: `${ag.duracao_estimada_minutos} min`,
+                                    },
+                                  ]),
+                            ] as Array<{
+                              label: string;
+                              icon: ReactNode;
+                              value: string;
+                              bold?: boolean;
+                            }>
+                          ).map((item) => (
+                            <div key={item.label} className="min-w-0">
+                              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                                {item.label}
+                              </p>
+                              <div
+                                className={`flex items-center gap-2 text-sm text-slate-600 ${item.bold ? "font-semibold" : ""}`}
+                              >
+                                {item.icon}
+                                <span className="truncate">{item.value}</span>
                               </div>
-                            ))}
+                            </div>
+                          ))}
 
                           {session.role === "estabelecimento" && (
                             <div
-                              className="ml-auto flex flex-wrap gap-2"
+                              className="col-span-2 flex flex-wrap justify-end gap-2 md:col-start-4"
                               onClick={(event) => event.stopPropagation()}
                             >
                               {ag.status === "pendente" && (
@@ -2146,63 +2147,28 @@ export const ProfilePage = ({
                           className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${isCollapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}
                         >
                           <div className="min-h-0 overflow-hidden">
-                            <div
-                              className={`${isEstablishment ? "hidden" : "mt-3"} flex items-end justify-between gap-3`}
+                            <dl
+                              className={`mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm ${isEstablishment ? "md:grid-cols-5" : "md:grid-cols-4"}`}
                             >
-                              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-600">
-                                {!isEstablishment && (
-                                  <span className="flex items-center gap-1">
-                                    <CalendarDays className="h-4 w-4 text-slate-600" />
-                                    {formatDate(ag.data_hora_inicio)}
-                                  </span>
-                                )}
-                                {!isEstablishment && (
-                                  <span className="flex items-center gap-1">
-                                    <ClockFading className="h-4 w-4 text-slate-600" />
-                                    {ag.duracao_estimada_minutos} min
-                                  </span>
-                                )}
-                                {ag.custo_final > 0 && (
-                                  <span>
-                                    R${" "}
-                                    {ag.custo_final.toLocaleString("pt-BR", {
-                                      minimumFractionDigits: 2,
-                                    })}
-                                  </span>
-                                )}
-                              </div>
-
-                              {!isEstablishment && (
-                                <div className="ml-auto flex shrink-0 flex-col items-end text-right">
-                                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
-                                    Profissional responsável
-                                  </span>
-                                  <span className="text-sm font-medium text-slate-700">
-                                    {ag.profissional_envolvido}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-
-                            {isEstablishment && (
-                              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm md:grid-cols-5">
-                                {(
+                              {(
+                                [
+                                  ["Profissional", ag.profissional_envolvido],
+                                  ["Técnica", ag.tecnica],
+                                  ["Produto", ag.produto],
+                                  ["Agendado em", formatDate(ag.criado_em)],
                                   [
-                                    [
-                                      "Profissional responsável",
-                                      ag.profissional_envolvido,
-                                    ],
-                                    ["Técnica", ag.tecnica],
-                                    ["Produto", ag.produto],
-                                    ["Agendado em", formatDate(ag.criado_em)],
-                                    [
-                                      "Valor",
-                                      ag.custo_final > 0
-                                        ? `R$ ${ag.custo_final.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
-                                        : null,
-                                    ],
-                                  ] as Array<[string, string | null]>
-                                ).map(([label, value]) => (
+                                    "Valor",
+                                    ag.custo_final > 0
+                                      ? `R$ ${ag.custo_final.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                                      : null,
+                                  ],
+                                ] as Array<[string, string | null]>
+                              )
+                                .filter(
+                                  ([label]) =>
+                                    isEstablishment || label !== "Profissional",
+                                )
+                                .map(([label, value]) => (
                                   <div key={label} className="min-w-0">
                                     <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
                                       {label}
@@ -2212,8 +2178,7 @@ export const ProfilePage = ({
                                     </dd>
                                   </div>
                                 ))}
-                              </dl>
-                            )}
+                            </dl>
 
                             {ag.motivo_recusa && (
                               <p className="mt-2 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">

@@ -54,6 +54,29 @@ class EstabelecimentoBase(BaseModel):
     )
 
 
+class EnderecoEstabelecimentoCreate(BaseModel):
+    """Endereço cadastral opcional recebido no cadastro do estabelecimento."""
+
+    endereco_texto: Optional[str] = None
+    cep: Optional[str] = Field(
+        None,
+        pattern=r"^\d{8}$",
+        description="CEP com oito dígitos, sem pontuação",
+    )
+    logradouro: Optional[str] = None
+    numero: Optional[str] = None
+    complemento: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    uf: Optional[str] = Field(
+        None,
+        pattern=r"^[A-Z]{2}$",
+        description="Sigla do estado com duas letras maiúsculas",
+    )
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+
+
 class EstabelecimentoCreate(EstabelecimentoBase):
     senha_hash: str = Field(
         ...,
@@ -65,6 +88,7 @@ class EstabelecimentoCreate(EstabelecimentoBase):
         ...,
         description="Confirmação de aceite dos termos"
     )
+    endereco: Optional[EnderecoEstabelecimentoCreate] = None
 
     @model_validator(mode="after")
     def validar_tipo_documento(self):

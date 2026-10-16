@@ -1688,12 +1688,56 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       return;
     }
 
+    const enderecoPayload = (() => {
+      if (hasNoFixedLocation) {
+        return null;
+      }
+
+      if (locationInputMode === "cep" && cepAddress) {
+        return {
+          endereco_texto: values.localizacao.trim(),
+          cep: getDocumentDigits(cepValue, 8),
+          logradouro: cepAddress.logradouro.trim() || null,
+          numero: cepNumero.trim() || null,
+          complemento: cepComplemento.trim() || null,
+          bairro: cepAddress.bairro.trim() || null,
+          cidade: cepAddress.localidade.trim() || null,
+          uf: cepAddress.uf.trim().toUpperCase() || null,
+        };
+      }
+
+      if (locationInputMode === "manual" && !isManualAddressEmpty(manualAddress)) {
+        return {
+          endereco_texto: values.localizacao.trim(),
+          logradouro: manualAddress.logradouro.trim() || null,
+          numero: manualAddress.numero.trim() || null,
+          complemento: manualAddress.complemento.trim() || null,
+          bairro: manualAddress.bairro.trim() || null,
+          cidade: manualAddress.cidade.trim() || null,
+          uf: manualAddress.uf.trim().toUpperCase() || null,
+        };
+      }
+
+      if (locationInputMode === "geo" && detectedLocation) {
+        return {
+          endereco_texto: detectedLocation,
+          numero: cepNumero.trim() || null,
+          complemento: cepComplemento.trim() || null,
+        };
+      }
+
+      return values.localizacao.trim()
+        ? { endereco_texto: values.localizacao.trim() }
+        : null;
+    })();
+
     const body = {
       nome_estabelecimento: values.nome_estabelecimento.trim(),
       responsavel: values.responsavel.trim(),
       telefone: values.telefone.trim(),
       email: values.email.trim(),
       localizacao: values.localizacao.trim(),
+      endereco: enderecoPayload,
       foto_estabelecimento_url: null,
       tipo_pessoa: isAutonomo ? "autonomo" : "juridica",
       cpf: isAutonomo ? getDocumentDigits(values.cnpj, 11) || null : null,

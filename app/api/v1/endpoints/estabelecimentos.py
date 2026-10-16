@@ -31,8 +31,23 @@ async def cadastrar_estabelecimento(
     """
     try:
         dados_estabelecimento = estabelecimento.model_dump(
-            mode="json"
+            mode="json",
+            exclude={"endereco"},
         )
+        dados_endereco = (
+            estabelecimento.endereco.model_dump(
+                mode="json",
+                exclude_none=True,
+            )
+            if estabelecimento.endereco
+            else {}
+        )
+        dados_endereco = {
+            campo: valor
+            for campo, valor in dados_endereco.items()
+            if valor is not None
+            and (not isinstance(valor, str) or valor.strip())
+        }
 
         # Verifica documento já cadastrado
         if estabelecimento.tipo_pessoa == "autonomo":
@@ -107,7 +122,44 @@ async def cadastrar_estabelecimento(
                 detail="Erro ao inserir o estabelecimento no banco de dados."
             )
 
-        return resposta.data[0]
+        estabelecimento_criado = resposta.data[0]
+
+        # Endereços são mantidos na tabela própria e vinculados pelo UUID.
+        # Cadastro sem endereço fixo não cria registro em public.enderecos.
+        if dados_endereco:
+            endereco_payload = {
+                **dados_endereco,
+                "estabelecimento_id": estabelecimento_criado["id"],
+            }
+
+            try:
+                endereco_salvo = (
+                    supabase_client
+                    .table("enderecos")
+                    .insert(endereco_payload)
+                    .execute()
+                )
+                if not endereco_salvo.data:
+                    raise RuntimeError("Supabase não retornou o endereço salvo.")
+            except Exception as error:
+                # Evita deixar o estabelecimento parcialmente cadastrado.
+                try:
+                    (
+                        supabase_client
+                        .table("estabelecimentos")
+                        .delete()
+                        .eq("id", estabelecimento_criado["id"])
+                        .execute()
+                    )
+                except Exception:
+                    pass
+
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Não foi possível salvar o endereço do estabelecimento."
+                ) from error
+
+        return estabelecimento_criado
 
     except HTTPException:
         raise

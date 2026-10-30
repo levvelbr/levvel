@@ -92,6 +92,8 @@ class EnderecoEstabelecimentoResponse(EnderecoEstabelecimentoCreate):
 
 
 class EstabelecimentoCreate(EstabelecimentoBase):
+    sem_endereco_fixo: bool = Field(False, exclude=True)
+
     senha_hash: str = Field(
         ...,
         min_length=6,
@@ -103,6 +105,15 @@ class EstabelecimentoCreate(EstabelecimentoBase):
         description="Confirmação de aceite dos termos"
     )
     endereco: Optional[EnderecoEstabelecimentoCreate] = None
+
+    @model_validator(mode="after")
+    def validar_posicao_do_endereco(self):
+        if self.sem_endereco_fixo:
+            if self.endereco is not None:
+                raise ValueError("Atendimento sem endereço fixo não deve enviar endereço cadastral.")
+        elif self.endereco is None or self.endereco.latitude is None:
+            raise ValueError("Confirme a posição do endereço antes de concluir o cadastro: informe latitude e longitude.")
+        return self
 
     @model_validator(mode="after")
     def validar_tipo_documento(self):

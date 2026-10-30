@@ -18,7 +18,7 @@ for key, value in {
 with patch("supabase.create_client", return_value=MagicMock()):
     from app.api.v1.endpoints import estabelecimentos as endpoints
 from app.core.security import get_usuario_logado
-from app.schemas.estabelecimento import EnderecoEstabelecimentoCreate
+from app.schemas.estabelecimento import EnderecoEstabelecimentoCreate, EstabelecimentoCreate
 from app.services.locations import distance_km, nearby_establishments
 
 
@@ -145,3 +145,19 @@ def test_me_route_returns_canonical_address(context):
     assert response.json()['localizacao'] == 'Endereço atual'
     assert 'servicos_oferecidos' in response.json()
     assert 'horario_funcionamento' in response.json()
+
+
+def test_fixed_address_signup_requires_position_but_mobile_signup_does_not():
+    payload = dict(nome_estabelecimento="Teste", responsavel="Pessoa", telefone="123",
+                   email="teste@example.com", localizacao="Rua teste", cnpj="12345678901234",
+                   senha_hash="test-only-password", aceitou_termos=True)
+    with pytest.raises(ValidationError, match="Confirme a posição"):
+        EstabelecimentoCreate(**payload, endereco={"endereco_texto": "Rua teste"})
+    assert EstabelecimentoCreate(**payload, endereco={"endereco_texto": "Rua teste", "latitude": 0, "longitude": 0}).endereco.latitude == 0
+    with pytest.raises(ValidationError, match="Confirme a posição"):
+        EstabelecimentoCreate(**payload)
+    mobile = EstabelecimentoCreate(**payload, sem_endereco_fixo=True, endereco=None)
+    assert mobile.endereco is None
+    assert "sem_endereco_fixo" not in mobile.model_dump()
+    with pytest.raises(ValidationError, match="sem endereço fixo"):
+        EstabelecimentoCreate(**payload, sem_endereco_fixo=True, endereco={"endereco_texto": "Rua teste", "latitude": 0, "longitude": 0})

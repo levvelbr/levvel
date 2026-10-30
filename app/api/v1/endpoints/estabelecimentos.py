@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Query
 # from supabase_auth import datetime
 from app.schemas import estabelecimento
-from app.schemas.estabelecimento import EstabelecimentoCreate, EstabelecimentoResponse, EstabelecimentoUpdate, EstabelecimentoPerfilResponse
+from app.schemas.estabelecimento import EstabelecimentoCreate, EstabelecimentoResponse, EstabelecimentoUpdate, EstabelecimentoPerfilResponse, EnderecoEstabelecimentoCreate, EnderecoEstabelecimentoResponse
 from app.core.config import supabase_client, settings
 from postgrest.exceptions import APIError
 from typing import List, Optional
@@ -15,7 +15,21 @@ from googleapiclient.discovery import build
 
 import secrets
 
+from app.services.locations import (
+    ESTABLISHMENT_SELECT, project_address, nearby_establishments,
+)
+
 router = APIRouter()
+
+
+def require_establishment(usuario_logado):
+    if usuario_logado.get("role") != "estabelecimento":
+        raise HTTPException(status_code=403, detail="Acesso exclusivo para estabelecimentos.")
+    user_id = usuario_logado.get("sub") or usuario_logado.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Estabelecimento não identificado.")
+    return user_id
+
 
 @router.post(
     "/",
@@ -159,7 +173,8 @@ async def cadastrar_estabelecimento(
                     detail="Não foi possível salvar o endereço do estabelecimento."
                 ) from error
 
-        return estabelecimento_criado
+        estabelecimento_criado["endereco"] = endereco_salvo.data[0] if dados_endereco else None
+        return project_address(estabelecimento_criado)
 
     except HTTPException:
         raise
@@ -178,26 +193,61 @@ async def cadastrar_estabelecimento(
         )
 
 @router.get("/listar_estabelecimentos", response_model=List[EstabelecimentoResponse])
-async def listar_estabelecimentos(categoria: Optional[str] = None):
+async def listar_estabelecimentos(
+    categoria: Optional[str] = None,
+    latitude: Optional[float] = Query(None, ge=-90, le=90, allow_inf_nan=False),
+    longitude: Optional[float] = Query(None, ge=-180, le=180, allow_inf_nan=False),
+    raio_km: Optional[float] = Query(None, gt=0, le=500, allow_inf_nan=False),
+):
+    """Lista ativos; com posição, ordena por distância em linha reta.
+
+    Com raio, exclui estabelecimentos sem coordenadas. Sem posição, preserva
+    a listagem geral. O endereço e as coordenadas vêm somente de enderecos.
     """
-    Lista todos os estabelecimentos. Permite filtros por categoria ou serviço.
-    """
+    if (latitude is None) != (longitude is None):
+        raise HTTPException(status_code=422, detail="Informe latitude e longitude juntas.")
+    if raio_km is not None and latitude is None:
+        raise HTTPException(status_code=422, detail="Informe sua posição para filtrar por raio.")
     try:
-        query = supabase_client.table("estabelecimentos").select("*")
-        
-        if categoria:
-            # Busca filtrando se o termo existe no array de serviços oferecidos
-            query = query.contains("servicos_oferecidos", [categoria])
-            
-        resposta = query.execute()
-        return resposta.data
-        
+        # Pagina para não truncar silenciosamente no limite padrão do PostgREST.
+        rows, offset = [], 0
+        while True:
+            query = supabase_client.table("estabelecimentos").select(ESTABLISHMENT_SELECT).eq("ativo", True).order("id")
+            if categoria:
+                query = query.contains("servicos_oferecidos", [categoria])
+            page = query.range(offset, offset + 499).execute().data or []
+            rows.extend(page)
+            if len(page) < 500:
+                break
+            offset += 500
+        return nearby_establishments(rows, latitude, longitude, raio_km)
     except APIError as error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar estabelecimentos: {error.message}"
-        )
-        
+        raise HTTPException(status_code=500, detail="Erro ao buscar estabelecimentos.") from error
+
+
+@router.patch("/me/endereco", response_model=EnderecoEstabelecimentoResponse)
+async def atualizar_endereco_estabelecimento(
+    endereco: EnderecoEstabelecimentoCreate,
+    usuario_logado: dict = Depends(get_usuario_logado),
+):
+    """Substitui o endereço cadastral; omitir coordenadas remove a posição antiga."""
+    estabelecimento_id = require_establishment(usuario_logado)
+    payload = endereco.model_dump(mode="json")
+    payload.update({
+        "estabelecimento_id": estabelecimento_id,
+        "atualizado_em": datetime.now(timezone.utc).isoformat(),
+    })
+    try:
+        response = supabase_client.table("enderecos").upsert(
+            payload, on_conflict="estabelecimento_id"
+        ).execute()
+        if not response.data:
+            raise HTTPException(status_code=500, detail="Não foi possível salvar o endereço.")
+        return response.data[0]
+    except APIError as error:
+        raise HTTPException(status_code=400, detail="Não foi possível salvar o endereço.") from error
+
+
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.events"
 ]
@@ -383,25 +433,6 @@ async def google_calendar_callback(
             google_calendar_email
     }
         
-@router.get("/{estabelecimento_id}", response_model=EstabelecimentoResponse)
-async def obter_perfil_estabelecimento(estabelecimento_id: str, usuario_logado: dict = Depends(get_usuario_logado)):
-    """
-    Busca os dados de perfil de um estabelecimento específico pelo ID.
-    """
-
-    if estabelecimento_id =="me":
-        estabelecimento_id = usuario_logado.get("sub")  # Obtém o ID do estabelecimento autenticado do token JWT
-    
-    resposta = supabase_client.table("estabelecimentos").select("*").eq("id", estabelecimento_id).execute()
-    
-    if not resposta.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Estabelecimento não encontrado."
-        )
-        
-    return resposta.data[0]
-
 @router.get("/me", response_model=EstabelecimentoPerfilResponse)
 async def obter_perfil_estabelecimento_autenticado(usuario_logado: dict = Depends(get_usuario_logado)):
     """
@@ -415,7 +446,7 @@ async def obter_perfil_estabelecimento_autenticado(usuario_logado: dict = Depend
             detail="ID do estabelecimento não fornecido ou inválido."
         )
     
-    resposta = supabase_client.table("estabelecimentos").select("*").eq("id", estabelecimento_id).execute()
+    resposta = supabase_client.table("estabelecimentos").select(ESTABLISHMENT_SELECT).eq("id", estabelecimento_id).execute()
     
     if not resposta.data:
         raise HTTPException(
@@ -423,7 +454,27 @@ async def obter_perfil_estabelecimento_autenticado(usuario_logado: dict = Depend
             detail="Estabelecimento não encontrado."
         )
         
-    return resposta.data[0]
+    return project_address(resposta.data[0])
+
+
+@router.get("/{estabelecimento_id}", response_model=EstabelecimentoResponse)
+async def obter_perfil_estabelecimento(estabelecimento_id: str, usuario_logado: dict = Depends(get_usuario_logado)):
+    """
+    Busca os dados de perfil de um estabelecimento específico pelo ID.
+    """
+
+    if estabelecimento_id =="me":
+        estabelecimento_id = usuario_logado.get("sub")  # Obtém o ID do estabelecimento autenticado do token JWT
+    
+    resposta = supabase_client.table("estabelecimentos").select(ESTABLISHMENT_SELECT).eq("id", estabelecimento_id).execute()
+    
+    if not resposta.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Estabelecimento não encontrado."
+        )
+        
+    return project_address(resposta.data[0])
 
 
 @router.patch("/me/update", response_model=EstabelecimentoPerfilResponse)
@@ -442,6 +493,9 @@ async def atualizar_perfil_estabelecimento(
             detail="ID do estabelecimento não fornecido ou inválido."
         )
     
+    if "localizacao" in estabelecimento_atualizado.model_fields_set:
+        raise HTTPException(status_code=422, detail="Atualize o endereço em /me/endereco.")
+
     update_data = estabelecimento_atualizado.model_dump(exclude_unset=True, mode="json")
     update_data = {k: v for k, v in update_data.items() if v is not None}  # Remove campos com valor None
     
@@ -460,7 +514,8 @@ async def atualizar_perfil_estabelecimento(
                 detail="Erro ao atualizar o perfil do estabelecimento."
             )
             
-        return resposta.data[0]
+        perfil = supabase_client.table("estabelecimentos").select(ESTABLISHMENT_SELECT).eq("id", estabelecimento_id).execute()
+        return project_address(perfil.data[0])
         
     except APIError as error:
         raise HTTPException(
@@ -530,7 +585,8 @@ async def upload_foto_perfil_estabelecimento(
                 detail="Erro ao atualizar a foto de perfil no banco de dados."
             )
 
-        return resposta.data[0]
+        perfil = supabase_client.table("estabelecimentos").select(ESTABLISHMENT_SELECT).eq("id", estabelecimento_id).execute()
+        return project_address(perfil.data[0])
 
     except Exception as e:
         raise HTTPException(

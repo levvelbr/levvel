@@ -73,8 +73,22 @@ class EnderecoEstabelecimentoCreate(BaseModel):
         pattern=r"^[A-Z]{2}$",
         description="Sigla do estado com duas letras maiúsculas",
     )
-    latitude: Optional[float] = Field(None, ge=-90, le=90)
-    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    latitude: Optional[float] = Field(None, ge=-90, le=90, allow_inf_nan=False)
+    longitude: Optional[float] = Field(None, ge=-180, le=180, allow_inf_nan=False)
+
+
+    @model_validator(mode="after")
+    def validar_coordenadas(self):
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("Informe latitude e longitude juntas.")
+        if not any((self.endereco_texto, self.logradouro, self.cidade)):
+            raise ValueError("Informe o endereço do estabelecimento.")
+        return self
+
+
+class EnderecoEstabelecimentoResponse(EnderecoEstabelecimentoCreate):
+    id: UUID
+    atualizado_em: Optional[datetime] = None
 
 
 class EstabelecimentoCreate(EstabelecimentoBase):
@@ -156,7 +170,9 @@ class EstabelecimentoUpdate(BaseModel):
     horario_funcionamento: Optional[Dict[str, Any]] = None
 
 
-class EstabelecimentoPerfilResponse(BaseModel):
+class EstabelecimentoPerfilResponse(EstabelecimentoBase):
+    endereco: Optional[EnderecoEstabelecimentoResponse] = None
+
     id: str = Field(
         ...,
         description="ID do estabelecimento (UUID)"
@@ -206,6 +222,9 @@ class EstabelecimentoPerfilResponse(BaseModel):
 
 
 class EstabelecimentoResponse(EstabelecimentoBase):
+    endereco: Optional[EnderecoEstabelecimentoResponse] = None
+    distancia_km: Optional[float] = None
+
     id: UUID
     ativo: bool = True
     criado_em: datetime

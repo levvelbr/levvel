@@ -54,7 +54,46 @@ class EstabelecimentoBase(BaseModel):
     )
 
 
+class EnderecoEstabelecimentoCreate(BaseModel):
+    """Endereço cadastral opcional recebido no cadastro do estabelecimento."""
+
+    endereco_texto: Optional[str] = None
+    cep: Optional[str] = Field(
+        None,
+        pattern=r"^\d{8}$",
+        description="CEP com oito dígitos, sem pontuação",
+    )
+    logradouro: Optional[str] = None
+    numero: Optional[str] = None
+    complemento: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    uf: Optional[str] = Field(
+        None,
+        pattern=r"^[A-Z]{2}$",
+        description="Sigla do estado com duas letras maiúsculas",
+    )
+    latitude: Optional[float] = Field(None, ge=-90, le=90, allow_inf_nan=False)
+    longitude: Optional[float] = Field(None, ge=-180, le=180, allow_inf_nan=False)
+
+
+    @model_validator(mode="after")
+    def validar_coordenadas(self):
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("Informe latitude e longitude juntas.")
+        if not any((self.endereco_texto, self.logradouro, self.cidade)):
+            raise ValueError("Informe o endereço do estabelecimento.")
+        return self
+
+
+class EnderecoEstabelecimentoResponse(EnderecoEstabelecimentoCreate):
+    id: UUID
+    atualizado_em: Optional[datetime] = None
+
+
 class EstabelecimentoCreate(EstabelecimentoBase):
+    sem_endereco_fixo: bool = Field(False, exclude=True)
+
     senha_hash: str = Field(
         ...,
         min_length=6,
@@ -65,6 +104,16 @@ class EstabelecimentoCreate(EstabelecimentoBase):
         ...,
         description="Confirmação de aceite dos termos"
     )
+    endereco: Optional[EnderecoEstabelecimentoCreate] = None
+
+    @model_validator(mode="after")
+    def validar_posicao_do_endereco(self):
+        if self.sem_endereco_fixo:
+            if self.endereco is not None:
+                raise ValueError("Atendimento sem endereço fixo não deve enviar endereço cadastral.")
+        elif self.endereco is None or self.endereco.latitude is None:
+            raise ValueError("Confirme a posição do endereço antes de concluir o cadastro: informe latitude e longitude.")
+        return self
 
     @model_validator(mode="after")
     def validar_tipo_documento(self):
@@ -132,7 +181,9 @@ class EstabelecimentoUpdate(BaseModel):
     horario_funcionamento: Optional[Dict[str, Any]] = None
 
 
-class EstabelecimentoPerfilResponse(BaseModel):
+class EstabelecimentoPerfilResponse(EstabelecimentoBase):
+    endereco: Optional[EnderecoEstabelecimentoResponse] = None
+
     id: str = Field(
         ...,
         description="ID do estabelecimento (UUID)"
@@ -182,6 +233,9 @@ class EstabelecimentoPerfilResponse(BaseModel):
 
 
 class EstabelecimentoResponse(EstabelecimentoBase):
+    endereco: Optional[EnderecoEstabelecimentoResponse] = None
+    distancia_km: Optional[float] = None
+
     id: UUID
     ativo: bool = True
     criado_em: datetime

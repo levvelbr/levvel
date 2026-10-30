@@ -5,6 +5,7 @@ on:
     branches: [ "backend" ]
     paths:
       - 'app/**'
+      - 'tests/**'
       - 'requirements.txt'
       - '.github/workflows/backend-ci-cd.yml'
 
@@ -29,6 +30,9 @@ jobs:
 
       - name: Executar Linter (Validação de Código)
         run: flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Testar localização e proximidade
+        run: python -m pytest -q tests
 
   deploy-backend:
     needs: test-and-lint

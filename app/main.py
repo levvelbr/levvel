@@ -14,7 +14,8 @@ origins = [
     "http://localhost:8000",
     "http://localhost:4173",
     "https://levvel.onrender.com",
-    "https://levvel.vercel.app"
+    "https://levvel.vercel.app",
+    "https://www.levvelbr.com.br"
     
 ]
 

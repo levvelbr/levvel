@@ -1533,6 +1533,9 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
             ? "Preencha logradouro, bairro, UF e cidade"
             : "Localização é obrigatória";
       }
+      if (!hasNoFixedLocation && formValues.localizacao.trim() && !coordinates) {
+        newErrors.localizacao = "Confirme a posição do estabelecimento: clique em Localizar pelo endereço e selecione o resultado, ou use sua posição estando no local.";
+      }
       if (
         hasNoFixedLocation &&
         !serviceCities.every((item) => item.state && item.city)
@@ -1698,6 +1701,14 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       return;
     }
 
+    // Recheck on final submission as well as on the address step.
+    if (!hasNoFixedLocation && !coordinates) {
+      setCurrentStep(1);
+      setErrors({ localizacao: "Defina a posição do estabelecimento antes de concluir o cadastro." });
+      scrollFormToTop();
+      return;
+    }
+
     const enderecoPayload = (() => {
       if (hasNoFixedLocation) {
         return null;
@@ -1751,6 +1762,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       email: values.email.trim(),
       localizacao: values.localizacao.trim(),
       endereco: enderecoPayload,
+      sem_endereco_fixo: hasNoFixedLocation,
       foto_estabelecimento_url: null,
       tipo_pessoa: isAutonomo ? "autonomo" : "juridica",
       cpf: isAutonomo ? getDocumentDigits(values.cnpj, 11) || null : null,
@@ -2297,7 +2309,10 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                 </div>
               ) : null}
               {!hasNoFixedLocation && locationInputMode !== "geo" && values.localizacao.trim() && (
-                <CoordinatePicker addressText={values.localizacao} value={coordinates} onChange={setCoordinates} />
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-slate-800">Confirmação da posição obrigatória para endereço fixo *</p>
+                  <CoordinatePicker addressText={values.localizacao} value={coordinates} onChange={setCoordinates} />
+                </div>
               )}
               {locationInputMode === "geo" && coordinates && (
                 <p className="text-sm text-slate-600">Confirme que você está no endereço do estabelecimento. A posição capturada será usada na busca por proximidade.</p>

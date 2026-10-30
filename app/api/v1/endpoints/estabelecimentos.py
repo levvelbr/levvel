@@ -284,8 +284,6 @@ async def google_calendar_callback(
             detail="Google não retornou refresh_token."
         )
 
-    # Não precisamos consultar calendars().get().
-    # Para o MVP usamos o e-mail do estabelecimento.
     google_calendar_email = estabelecimento["email"]
 
     resposta_update = (
@@ -323,13 +321,13 @@ async def google_calendar_callback(
             )
         )
 
-    return {
-        "message":
-            "Google Calendar conectado com sucesso.",
+    print("=== CALLBACK NOVO EXECUTADO ===")
+    print("FRONTEND_URL:", settings.FRONTEND_URL)
 
-        "google_calendar_email":
-            google_calendar_email
-    }
+    return RedirectResponse(
+        url=f"{settings.FRONTEND_URL}?google_connected=true",
+        status_code=302
+    )
         
 @router.get("/{estabelecimento_id}", response_model=EstabelecimentoResponse)
 async def obter_perfil_estabelecimento(estabelecimento_id: str, usuario_logado: dict = Depends(get_usuario_logado)):

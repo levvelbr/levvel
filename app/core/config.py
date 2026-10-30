@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     GOOGLE_REDIRECT_URI: str
+    FRONTEND_URL: str
 
     # Mapeia automaticamente o arquivo .env
     model_config = SettingsConfigDict(env_file=".env")

@@ -1,4 +1,4 @@
 .env
 levvel
-sql
-tests
+/tests/
+/sql/

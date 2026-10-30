@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getCurrentPosition, getGeolocationErrorMessage, type Coordinates } from "../utils/geolocation";
 import api from "../services/api";
 import EstablishmentCard from "./EstablishmentCard";
 import type { BookingEstablishment } from "./BookingForm";
 
 interface Establishment {
+  distancia_km?: number | null;
   id: string;
   nome_estabelecimento: string;
   responsavel: string;
@@ -41,7 +43,28 @@ export const EstablishmentList = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [position, setPosition] = useState<Coordinates | null>(null);
+  const [radius, setRadius] = useState(10);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const locationRequest = useRef(0);
+  useEffect(() => () => { locationRequest.current += 1; }, []);
+  const locate = async () => {
+    const request = ++locationRequest.current;
+    setLocating(true);
+    setLocationError(null);
+    try {
+      const coords = await getCurrentPosition();
+      if (request === locationRequest.current) setPosition(coords);
+    } catch (err) {
+      if (request === locationRequest.current) setLocationError(getGeolocationErrorMessage(err));
+    } finally {
+      if (request === locationRequest.current) setLocating(false);
+    }
+  };
+
   useEffect(() => {
+    const controller = new AbortController();
     const fetchEstablishments = async () => {
       setLoading(true);
       setError(null);
@@ -49,6 +72,7 @@ export const EstablishmentList = ({
       try {
         const response = await api.get(
           "/v1/estabelecimentos/listar_estabelecimentos",
+          { signal: controller.signal, params: position ? { ...position, raio_km: radius } : undefined },
         );
         const data = response.data as unknown;
 
@@ -60,17 +84,19 @@ export const EstablishmentList = ({
           (item) => item.ativo,
         );
 
-        setEstablishments(activeEstablishments);
+        if (!controller.signal.aborted) setEstablishments(activeEstablishments);
       } catch (err: unknown) {
+        if (controller.signal.aborted) return;
         const message = err instanceof Error ? err.message : String(err);
         setError(`Falha ao carregar estabelecimentos: ${message}`);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
-    fetchEstablishments();
-  }, []);
+    void fetchEstablishments();
+    return () => controller.abort();
+  }, [position, radius]);
 
   const normalizeText = (value: string) =>
     value
@@ -126,13 +152,28 @@ export const EstablishmentList = ({
         ) : null}
       </div>
 
+      <div className="mb-5 space-y-2 rounded-xl bg-slate-50 p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={() => void locate()} disabled={locating} className="rounded-lg border border-emerald-700 px-3 py-2 text-sm text-emerald-800 disabled:opacity-50">
+            {locating ? "Obtendo localização..." : position ? "Atualizar minha posição" : "Buscar perto de mim"}
+          </button>
+          {position && <>
+            <label className="text-sm">Raio da busca <select value={radius} onChange={(event) => setRadius(Number(event.target.value))} className="ml-2 rounded border p-2">
+              {[1, 5, 10, 25, 50, 100].map((km) => <option key={km} value={km}>{km} km</option>)}
+            </select></label>
+            <button type="button" className="text-sm underline" onClick={() => { locationRequest.current += 1; setLocating(false); setPosition(null); setLocationError(null); }}>Ver todos</button>
+          </>}
+        </div>
+        <p className="text-sm text-slate-600">{position ? "Distâncias em linha reta. A busca por raio inclui apenas estabelecimentos com posição cadastrada." : "Use sua localização para encontrar estabelecimentos próximos. Sua posição é usada somente nesta busca."}</p>
+        {locationError && <p role="alert" className="text-sm text-rose-700">{locationError}</p>}
+      </div>
       {loading ? (
         <p className="text-sm text-slate-600">Carregando estabelecimentos...</p>
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : filteredEstablishments.length === 0 ? (
         <p className="establishment-mount text-sm text-slate-600">
-          Nenhum estabelecimento encontrado para os filtros aplicados.
+          {position ? "Nenhum estabelecimento com posição cadastrada encontrado neste raio. Amplie o raio ou selecione Ver todos." : "Nenhum estabelecimento encontrado para os filtros aplicados."}
         </p>
       ) : (
         <div
@@ -146,6 +187,7 @@ export const EstablishmentList = ({
               style={{ animationDelay: `${Math.min(index, 7) * 60}ms` }}
             >
               <EstablishmentCard
+                distancia_km={establishment.distancia_km}
                 id={establishment.id}
                 nome_estabelecimento={establishment.nome_estabelecimento}
                 telefone={establishment.telefone}
@@ -171,3 +213,4 @@ export const EstablishmentList = ({
 };
 
 export default EstablishmentList;
+

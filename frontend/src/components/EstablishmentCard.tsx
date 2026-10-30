@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import type { BookingEstablishment } from "./BookingForm";
 
 interface EstablishmentCardProps {
+  distancia_km?: number | null;
   id: string;
   nome_estabelecimento: string;
   telefone: string;
@@ -18,6 +19,7 @@ interface EstablishmentCardProps {
 }
 
 export const EstablishmentCard = ({
+  distancia_km,
   id,
   nome_estabelecimento,
   telefone,
@@ -90,6 +92,9 @@ export const EstablishmentCard = ({
           <p className="truncate text-sm text-slate-600 sm:text-base">
             {localizacao}
           </p>
+          {distancia_km != null && <p className="text-sm font-semibold text-emerald-700">
+            {new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(distancia_km)} km de você
+          </p>}
         </div>
 
         <div className="flex flex-col gap-2 text-sm text-slate-700">
@@ -164,3 +169,4 @@ export const EstablishmentCard = ({
 };
 
 export default EstablishmentCard;
+

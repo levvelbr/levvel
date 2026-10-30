@@ -1,11 +1,11 @@
-interface Coordinates {
+export interface Coordinates {
   latitude: number;
   longitude: number;
 }
 
 export class GeolocationUnsupportedError extends Error {}
 
-const getCurrentPosition = (): Promise<Coordinates> => {
+export const getCurrentPosition = (): Promise<Coordinates> => {
   if (!("geolocation" in navigator)) {
     return Promise.reject(
       new GeolocationUnsupportedError(
@@ -42,7 +42,7 @@ const reverseGeocode = async (coords: Coordinates): Promise<string> => {
 
   const response = await fetch(
     `https://nominatim.openstreetmap.org/reverse?${params.toString()}`,
-    { headers: { Accept: "application/json" } },
+    { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000) },
   );
 
   if (!response.ok) {
@@ -76,15 +76,39 @@ const reverseGeocode = async (coords: Coordinates): Promise<string> => {
   throw new Error("Não foi possível identificar o endereço.");
 };
 
-/** Resolves the user's current location as a human-readable string, falling back to raw coordinates. */
-export const getCurrentLocationLabel = async (): Promise<string> => {
-  const coords = await getCurrentPosition();
+export interface CurrentLocation extends Coordinates {
+  label: string;
+}
 
-  try {
-    return await reverseGeocode(coords);
-  } catch {
-    return formatCoordinates(coords);
-  }
+export const getCurrentLocation = async (): Promise<CurrentLocation> => {
+  const coords = await getCurrentPosition();
+  let label = formatCoordinates(coords);
+  try { label = await reverseGeocode(coords); } catch { /* Coordinates remain usable. */ }
+  return { ...coords, label };
+};
+
+export const getCurrentLocationLabel = async (): Promise<string> =>
+  (await getCurrentLocation()).label;
+
+export interface AddressCandidate extends Coordinates {
+  label: string;
+}
+
+/** Explicit user search; candidates must be selected, never accepted silently. */
+export const searchAddressCoordinates = async (address: string): Promise<AddressCandidate[]> => {
+  const params = new URLSearchParams({ format: "jsonv2", q: address, countrycodes: "br", limit: "5" });
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+    headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error("Não foi possível consultar o endereço. Tente novamente.");
+  const data: unknown = await response.json();
+  if (!Array.isArray(data)) throw new Error("Resposta de localização inválida.");
+  return data.flatMap((item: { lat?: string; lon?: string; display_name?: string }) => {
+    const latitude = Number(item.lat), longitude = Number(item.lon);
+    return item.lat && item.lon && item.display_name && Number.isFinite(latitude) &&
+      Number.isFinite(longitude) && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
+      ? [{ latitude, longitude, label: item.display_name }] : [];
+  });
 };
 
 export const getGeolocationErrorMessage = (error: unknown): string => {
@@ -109,3 +133,4 @@ export const getGeolocationErrorMessage = (error: unknown): string => {
     ? error.message
     : "Não foi possível obter sua localização.";
 };
+

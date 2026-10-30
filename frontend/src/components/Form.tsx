@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, ChevronDown, LocateFixed, X } from "lucide-react";
+import CoordinatePicker from "./CoordinatePicker";
 import Input from "./Input";
 import Button from "./Button";
 import api from "../services/api";
@@ -22,7 +23,8 @@ import {
 } from "../utils/documentMasks";
 import { getApiErrorMessage } from "../utils/apiErrors";
 import {
-  getCurrentLocationLabel,
+  getCurrentLocation,
+  type Coordinates,
   getGeolocationErrorMessage,
 } from "../utils/geolocation";
 import { CATEGORY_OPTIONS } from "../utils/categoryIcons";
@@ -549,6 +551,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
   const [manualAddress, setManualAddress] = useState<ManualAddress>(
     initialManualAddress(),
   );
+  const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
   const [detectedLocation, setDetectedLocation] = useState<string | null>(null);
   const cepModeButtonRef = useRef<HTMLButtonElement | null>(null);
   const manualModeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -859,15 +862,18 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     setIsLocating(true);
     setLocationError(null);
     setDetectedLocation(null);
+    setCoordinates(null);
 
     try {
-      const label = await getCurrentLocationLabel();
+      const location = await getCurrentLocation();
+      const { label } = location;
 
       if (requestId !== geoRequestIdRef.current) {
         return;
       }
 
       setDetectedLocation(label);
+      setCoordinates({ latitude: location.latitude, longitude: location.longitude });
       setValues((prev) => ({
         ...prev,
         localizacao: composeGeoLocation(label, cepNumero, cepComplemento),
@@ -948,6 +954,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       setCepError(null);
       setManualAddress(initialManualAddress());
       setDetectedLocation(null);
+    setCoordinates(null);
       openServiceLocationModal();
     }
   };
@@ -968,6 +975,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
     setCepError(null);
     setManualAddress(initialManualAddress());
     setDetectedLocation(null);
+    setCoordinates(null);
     setLocationError(null);
     setErrors((prev) => {
       const nextErrors = { ...prev };
@@ -1010,6 +1018,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
     setManualAddress(nextAddress);
     setDetectedLocation(null);
+    setCoordinates(null);
     setValues((prev) => ({
       ...prev,
       localizacao: composeManualLocation(nextAddress),
@@ -1031,6 +1040,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
   };
 
   const handleCepChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setCoordinates(null);
     setCepValue(maskCep(event.target.value));
   };
 
@@ -1695,6 +1705,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
       if (locationInputMode === "cep" && cepAddress) {
         return {
+          ...coordinates,
           endereco_texto: values.localizacao.trim(),
           cep: getDocumentDigits(cepValue, 8),
           logradouro: cepAddress.logradouro.trim() || null,
@@ -1708,6 +1719,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
       if (locationInputMode === "manual" && !isManualAddressEmpty(manualAddress)) {
         return {
+          ...coordinates,
           endereco_texto: values.localizacao.trim(),
           logradouro: manualAddress.logradouro.trim() || null,
           numero: manualAddress.numero.trim() || null,
@@ -1720,7 +1732,8 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 
       if (locationInputMode === "geo" && detectedLocation) {
         return {
-          endereco_texto: detectedLocation,
+          ...coordinates,
+          endereco_texto: values.localizacao.trim(),
           numero: cepNumero.trim() || null,
           complemento: cepComplemento.trim() || null,
         };
@@ -1805,6 +1818,7 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
       setCepError(null);
       setManualAddress(initialManualAddress());
       setDetectedLocation(null);
+    setCoordinates(null);
       setCurrentStep(1);
       onLoginSuccess(session);
     } catch (error: unknown) {
@@ -2282,6 +2296,12 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                   </Button>
                 </div>
               ) : null}
+              {!hasNoFixedLocation && locationInputMode !== "geo" && values.localizacao.trim() && (
+                <CoordinatePicker addressText={values.localizacao} value={coordinates} onChange={setCoordinates} />
+              )}
+              {locationInputMode === "geo" && coordinates && (
+                <p className="text-sm text-slate-600">Confirme que você está no endereço do estabelecimento. A posição capturada será usada na busca por proximidade.</p>
+              )}
               {errors.localizacao && (
                 <ErrorBadge message={errors.localizacao} />
               )}
@@ -2892,3 +2912,4 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
 };
 
 export default Form;
+

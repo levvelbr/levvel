@@ -20,6 +20,7 @@ import { AuthModal } from "../components/AuthModal";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
 import { EstablishmentNavigation } from "../components/EstablishmentNavigation";
+import EstablishmentAddressEditor, { type EstablishmentAddress } from "../components/EstablishmentAddressEditor";
 import Input from "../components/Input";
 import {
   MultiValueInput,
@@ -56,6 +57,7 @@ interface ClienteProfile {
 }
 
 interface EstabelecimentoProfile {
+  endereco?: EstablishmentAddress | null;
   id: string;
   nome_estabelecimento: string;
   responsavel: string;
@@ -1571,6 +1573,7 @@ export const ProfilePage = ({
                     </form>
                   ) : (
                     <div className="data-fade-in space-y-4">
+                      <EstablishmentAddressEditor address={estabProfile.endereco} legacyLabel={estabProfile.localizacao} onSaved={(endereco) => setEstabProfile((prev) => prev ? { ...prev, endereco, localizacao: endereco.endereco_texto || prev.localizacao } : prev)} />
                       <dl className="grid gap-3 text-sm sm:grid-cols-2">
                         {(
                           [
@@ -2234,3 +2237,4 @@ export const ProfilePage = ({
     </div>
   );
 };
+

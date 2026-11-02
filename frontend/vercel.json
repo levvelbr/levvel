@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://levvel.onrender.com/api/:path*"
+      "destination": "https://levvelbr.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",

@@ -686,6 +686,9 @@ export const ClientForm = ({
                       onChange={handleChange}
                       placeholder="Digite sua senha"
                     />
+                    <p className="text-xs text-slate-500">
+                      A senha deve ter no mínimo 6 caracteres.
+                    </p>
                     {hasAttemptedSubmitStep2 && errors.senha ? (
                       <ErrorBadge message={errors.senha} />
                     ) : null}

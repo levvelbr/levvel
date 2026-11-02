@@ -2680,6 +2680,9 @@ export const Form = ({ onLoginSuccess }: FormProps) => {
                 onChange={handleChange}
                 placeholder="Senha do estabelecimento"
               />
+              <p className="text-xs text-slate-500">
+                A senha deve ter no mínimo 6 caracteres.
+              </p>
               {errors.senha_hash && <ErrorBadge message={errors.senha_hash} />}
             </label>
 

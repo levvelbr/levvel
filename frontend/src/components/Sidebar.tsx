@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Calendar,
@@ -22,6 +23,13 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, session, logout } = useAuth();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const header = document.querySelector("header");
+    header?.setAttribute("inert", "");
+    return () => header?.removeAttribute("inert");
+  }, [isOpen]);
 
   const bookingsLabel =
     session?.role === "estabelecimento" ? "Minha agenda" : "Meus agendamentos";
@@ -49,13 +57,13 @@ export const Sidebar = ({ isOpen, onClose, onOpenLogin }: SidebarProps) => {
     <>
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 transition-opacity"
+          className="fixed inset-0 z-60 bg-black/50 transition-opacity"
           onClick={onClose}
         />
       )}
 
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-72 transform bg-white shadow-xl transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 z-70 h-full w-72 transform bg-white shadow-xl transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

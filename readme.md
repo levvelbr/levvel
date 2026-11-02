@@ -85,14 +85,14 @@ uvicorn app.main:app --reload
 ## 📖 Documentação para o Front-end (Vite / Vue)
 O FastAPI gera a documentação dos endpoints automaticamente. Com o servidor rodando, acesse a interface interativa para visualizar todos os payloads (JSON) de entrada e saída esperados:
 
-Swagger UI (Recomendado): https://levvel.onrender.com/docs
+Swagger UI (Recomendado): https://levvelbr.onrender.com/docs
 
 ## 🔒 Configurações de CORS Ativas
 A API está explicitamente configurada para aceitar requisições originadas de:
 
 http://localhost:5173 (Porta padrão do Vite)
 
-https://levvel.onrender.com (API Render)
+https://levvelbr.onrender.com (API Render)
 
 http://127.0.0.1:5173
 

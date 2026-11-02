@@ -4,7 +4,7 @@ from app.api.v1.endpoints import clientes, estabelecimentos, agendamentos, auth 
 
 app = FastAPI(
     title="Levvel API",
-    description="Backend assíncrono para o sistema de agendamentos Levvel",
+    description="Backend assíncrono para o sistema de agendamentos Levvel.",
     version="1.0.0",
 )
 
